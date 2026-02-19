@@ -588,8 +588,9 @@ def generate_sparkline(ticker_symbol):
     if cached: return cached
 
     try:
-        with yf_lock:
-             hist = yf.download(ticker_symbol, period="5d", interval="60m", progress=False)
+        # Removed lock for concurrency
+        # with yf_lock:
+        hist = yf.download(ticker_symbol, period="5d", interval="60m", progress=False)
         
         if hist is None or hist.empty:
             return None, "--", 0
