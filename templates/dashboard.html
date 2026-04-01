@@ -56,7 +56,7 @@
                             {{ calendar.date_str }}
                         </div>
                         <!-- Weekday -->
-                        <div class="{% if config.LANGUAGE == 'EN' %}text-[5.5rem]{% else %}text-[7rem]{% endif %} font-black leading-none mb-3 uppercase tracking-tight">{{ calendar.weekday }}</div>
+                        <div class="{% if config.LANGUAGE == 'EN' %}text-[5.5rem]{% else %}text-[7rem]{% endif %} font-black leading-[1.15] mb-3 uppercase tracking-tight">{{ calendar.weekday }}</div>
                         <div class="text-4xl font-bold mt-1 text-gray-800">{{ calendar.lunar }}</div>
                     </div>
                     
@@ -67,8 +67,8 @@
                              <span class="text-4xl font-bold text-gray-600 uppercase tracking-widest">{% if calendar.is_rest_today %}{% if config.LANGUAGE == 'EN' %}Next Work{% else %}下个工作{% endif %}{% else %}{% if config.LANGUAGE == 'EN' %}Next Off{% else %}下个休息{% endif %}{% endif %}</span>
                              <span class="text-4xl font-bold text-gray-500">{% if config.LANGUAGE == 'EN' %}In {{ calendar.next_day.days_away }} days{% else %}{{ calendar.next_day.days_away }}天后{% endif %}</span>
                          </div>
-                         <div class="text-6xl font-black leading-none">{{ calendar.next_day.date }}</div>
-                         <div class="text-4xl font-bold mt-2 truncate max-w-[24rem] ml-auto">{{ calendar.next_day.name }}</div>
+                         <div class="text-6xl font-black leading-[1.15]">{{ calendar.next_day.date }}</div>
+                         <div class="text-4xl font-bold mt-2 truncate max-w-[24rem] ml-auto pb-1">{{ calendar.next_day.name }}</div>
                     </div>
                     {% endif %}
                 </div>
@@ -165,8 +165,8 @@
                     <div class="flex flex-col items-center justify-end h-full border-r-2 border-gray-200 relative px-2 py-1">
                         <span class="text-3xl font-bold mb-1">{{ item.label }}</span>
                         <img src="http://openweathermap.org/img/wn/{{ item.icon }}@2x.png" class="w-[70px] h-[70px] grayscale invert contrast-125 mb-0">
-                        <span class="text-5xl font-black mt-0 leading-none">{{ item.temp }}°</span>
-                        <span class="text-3xl font-bold text-gray-500 mt-1 truncate w-full text-center">{{ item.desc }}</span>
+                        <span class="text-5xl font-black mt-0 leading-[1.15]">{{ item.temp }}°</span>
+                        <span class="text-3xl font-bold text-gray-500 mt-1 truncate w-full text-center pb-1">{{ item.desc }}</span>
                     </div>
                     {% endfor %}
                     
@@ -175,8 +175,8 @@
                          <span class="text-3xl font-bold mb-1">{{ weather.tomorrow.label }}</span>
                          <img src="http://openweathermap.org/img/wn/{{ weather.tomorrow.icon }}@2x.png" class="w-[70px] h-[70px] grayscale invert contrast-125 mb-0">
                          <!-- High/Low -->
-                         <span class="text-5xl font-black mt-0 leading-none">{{ weather.tomorrow.temp }}</span>
-                         <span class="text-3xl font-bold text-gray-500 mt-1 truncate w-full text-center">{{ weather.tomorrow.desc }}</span>
+                         <span class="text-5xl font-black mt-0 leading-[1.15]">{{ weather.tomorrow.temp }}</span>
+                         <span class="text-3xl font-bold text-gray-500 mt-1 truncate w-full text-center pb-1">{{ weather.tomorrow.desc }}</span>
                     </div>
                 </div>
             </div>
@@ -232,8 +232,8 @@
                 <div class="panel flex-1 flex flex-col justify-center px-6 py-2">
                     <!-- Row 1: Name + Price -->
                     <div class="flex justify-between items-end mb-2">
-                        <span class="text-4xl font-black leading-none">{{ item.name }}</span>
-                        <span class="text-6xl font-black leading-none tracking-tighter">{{ item.price }}</span>
+                        <span class="text-4xl font-black leading-[1.15]">{{ item.name }}</span>
+                        <span class="text-6xl font-black leading-[1.15] tracking-tighter">{{ item.price }}</span>
                     </div>
                     
                     <!-- Row 2: Sparkline + Change -->
