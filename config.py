@@ -42,7 +42,7 @@ class Config:
     # If using formatted string in env: '[{"symbol": "SGDCNY=X", "name": "SGD/CNY"}, ...]'
     # OR simple comma separated: "SGDCNY=X,BTC-USD" (will use symbol as name)
     FINANCE_TICKERS_RAW = os.environ.get("FINANCE_TICKERS", 
-        '[{"symbol": "SGDCNY=X", "name": "SGD/CNY"}, {"symbol": "CNY=X", "name": "USD/CNY"}, {"symbol": "BTC-USD", "name": "BTC/USD"}]'
+        '[{"symbol": "SGDCNY=X", "name": "SGD/CNY"}, {"symbol": "VWRA.L", "name": "VWRA"}, {"symbol": "^IXIC", "name": "NASDAQ"}]'
     )
     
     @staticmethod

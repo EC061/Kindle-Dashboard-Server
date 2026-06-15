@@ -57,15 +57,19 @@ def dashboard():
         except:
              chart, price, change = None, "--", 0
              
-        # Formatting Price
+        # Formatting Price (by magnitude: forex / ETF / index & crypto)
         if price == "--":
             p_str = "--"
-        elif "BTC" in t['name']:
-            p_str = f"{price:,.0f}" 
         else:
-             try:
-                p_str = f"{price:.4f}"
-             except: p_str = str(price)
+            try:
+                if price >= 1000:
+                    p_str = f"{price:,.0f}"      # indices & crypto: 25,890 / 65,684
+                elif price >= 100:
+                    p_str = f"{price:,.2f}"      # ETFs: 190.34 / 721.32
+                else:
+                    p_str = f"{price:.4f}"       # forex: 5.3210 / 6.7562
+            except:
+                p_str = str(price)
 
         finance_data.append({
             "name": t['name'],
