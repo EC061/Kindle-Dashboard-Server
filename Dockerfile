@@ -38,7 +38,7 @@ COPY pyproject.toml uv.lock ./
 # Install dependencies and Chromium before copying application code. These
 # expensive layers now remain reusable when only the dashboard source changes.
 RUN uv sync --frozen --no-install-project --no-dev && \
-    uv run playwright install chromium
+    NODE_NO_WARNINGS=1 uv run playwright install chromium
 
 # Copy application code
 COPY . .

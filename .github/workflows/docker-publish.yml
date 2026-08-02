@@ -64,7 +64,5 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: |
-            type=registry,ref=${{ env.CACHE_IMAGE }}
-            type=gha
+          cache-from: type=registry,ref=${{ env.CACHE_IMAGE }}
           cache-to: type=registry,ref=${{ env.CACHE_IMAGE }},mode=max,image-manifest=true,oci-mediatypes=true
