@@ -106,7 +106,26 @@ The refreshable Microsoft token cache is stored with owner-only permissions at `
 
 After configuring either provider, start the service and check `http://localhost:5000/dashboard`. Provider failures reuse the last successful five-minute cache instead of clearing the week view.
 
-### 4. Running Locally
+### 4. Kindle Scribe local overlays
+
+The server leaves dedicated blank regions for FBInk to draw the clock and battery percentage locally. For the native 2480x1860 landscape layout, use:
+
+```bash
+ENABLE_LOCAL_CLOCK=1
+CLOCK_X=60
+CLOCK_Y=180
+CLOCK_SIZE=118
+CLOCK_FONT="${BASE_DIR}/IBMPlexMono-SemiBold.ttf"
+
+BATT_X=2300
+BATT_Y=62
+BATT_SIZE=48
+BATT_FONT="${BASE_DIR}/IBMPlexMono-SemiBold.ttf"
+```
+
+The battery box occupies approximately `x=2273–2456`, `y=31–152` in native Scribe pixels. Small adjustments may be needed if a different FBInk font is used.
+
+### 5. Running Locally
 
 1.  **Install uv**: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 2.  **Setup**:

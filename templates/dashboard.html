@@ -68,7 +68,7 @@
         </div>
 
         <div id="weather-panel" class="panel col-start-2 row-start-1 flex flex-col px-4 py-3 overflow-hidden">
-            <div class="grid grid-cols-[165px_235px_150px_180px_1fr] gap-3 h-[100px] items-center">
+            <div class="grid grid-cols-[140px_210px_135px_155px_140px_1fr] gap-2 h-[100px] items-center">
                 <div class="min-w-0">
                     <div class="text-2xl font-black leading-tight line-clamp-2">{{ weather.location.name }}</div>
                     <div class="text-xl font-bold text-gray-500 mt-1">{% if config.LANGUAGE == 'EN' %}Now{% else %}现在{% endif %}</div>
@@ -96,6 +96,7 @@
                     <div class="whitespace-nowrap"><span class="text-base font-bold text-gray-500">AQI</span><span class="text-xl font-black ml-1">{{ weather.current.aqi }}</span></div>
                     <div class="whitespace-nowrap"><span class="text-base font-bold text-gray-500">{% if config.LANGUAGE == 'EN' %}Rain{% else %}雨{% endif %}</span><span class="text-xl font-black ml-1">{{ weather.current.rain_chance }}</span></div>
                 </div>
+                <div id="battery-placeholder" class="h-[82px] w-full self-center border-2 border-black bg-white" aria-label="{% if config.LANGUAGE == 'EN' %}Local battery percentage placeholder{% else %}本地电池百分比占位框{% endif %}"></div>
             </div>
             <div class="grid grid-cols-4 flex-1 border-t-2 border-gray-200 mt-2 min-h-0">
                 <div class="flex flex-col justify-center px-3 border-r-2 border-gray-200 min-w-0">

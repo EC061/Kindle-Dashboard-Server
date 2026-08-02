@@ -104,7 +104,26 @@ Microsoft 可刷新令牌会以仅文件所有者可读的权限保存在 `/data
 
 配置任一提供商后，启动服务并访问 `http://localhost:5000/dashboard` 检查。如果提供商暂时失败，界面会继续使用上次成功的五分钟缓存，不会清空周视图。
 
-### 4. 本地运行
+### 4. Kindle Scribe 本地叠加信息
+
+服务端为 FBInk 在 Kindle 上本地绘制时钟和电池百分比保留了空白区域。原生 2480x1860 横屏布局可使用：
+
+```bash
+ENABLE_LOCAL_CLOCK=1
+CLOCK_X=60
+CLOCK_Y=180
+CLOCK_SIZE=118
+CLOCK_FONT="${BASE_DIR}/IBMPlexMono-SemiBold.ttf"
+
+BATT_X=2300
+BATT_Y=62
+BATT_SIZE=48
+BATT_FONT="${BASE_DIR}/IBMPlexMono-SemiBold.ttf"
+```
+
+电池框在 Scribe 原生像素中约为 `x=2273–2456`、`y=31–152`。如果使用不同的 FBInk 字体，可能需要小幅调整。
+
+### 5. 本地运行
 
 1.  **安装 uv**: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 2.  **准备环境**:
