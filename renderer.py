@@ -49,12 +49,12 @@ def capture_dashboard(url):
 
 def process_image_for_kindle(input_bytes):
     """
-    Processes the raw screenshot for Kindle Oasis 2 display.
+    Processes the raw screenshot for a Kindle display.
     Apply resizing (if needed), rotation (if needed), grayscale, and dithering.
     
-    The user's request says: "1680*1264" and the CSS is landscape.
-    Kindle typically renders portrait. 
-    If the user holds the Kindle sideways, we just need to ensure the image is 1680x1264 or 1264x1680.
+    The CSS uses the original landscape design canvas, then the renderer scales
+    and crops it to the configured device resolution (2480x1860 by default for
+    Kindle Scribe landscape).
     """
     
     try:
@@ -129,5 +129,4 @@ def render_dashboard_to_bytes(url):
     print(f"[{end_time}] Render finished in {(end_time - start_time).total_seconds()}s")
     
     return processed_png_io
-
 

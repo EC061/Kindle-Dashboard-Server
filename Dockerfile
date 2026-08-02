@@ -4,6 +4,7 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 # Install system dependencies for Playwright/Chromium and Timezone support
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata \
+    fonts-noto-cjk \
     libnss3 \
     libnspr4 \
     libatk1.0-0 \

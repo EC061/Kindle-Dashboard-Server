@@ -5,8 +5,20 @@ import time
 import io
 import hashlib
 from concurrent.futures import ThreadPoolExecutor
-# Import from our new data layer
-from data_services import get_weather, get_calendar_info, get_hacker_news, generate_sparkline
+from calendar_services import (
+    get_cached_week_agenda,
+    get_empty_week_agenda,
+    get_week_agenda,
+)
+# Import from our data layer
+from data_services import (
+    generate_sparkline,
+    get_cached_weather,
+    get_calendar_info,
+    get_empty_weather,
+    get_hacker_news,
+    get_weather,
+)
 from config import Config
 
 executor = ThreadPoolExecutor(max_workers=20)
@@ -27,6 +39,7 @@ def dashboard():
     # Submit Data Fetch Tasks in Parallel
     future_weather = executor.submit(get_weather)
     future_calendar = executor.submit(get_calendar_info)
+    future_agenda = executor.submit(get_week_agenda)
     future_news = executor.submit(get_hacker_news)
 
     # Finance Tasks
@@ -35,15 +48,24 @@ def dashboard():
 
     # Gather Results
     try:
-        weather = future_weather.result(timeout=15)
+        # Weather and AQI are separate upstream requests and can together take
+        # close to 20 seconds on a cold refresh.
+        weather = future_weather.result(timeout=25)
     except Exception as e:
         print(f"Weather Timeout: {e}")
-        weather = {"current": {"temp": "--"}, "forecast": [], "tomorrow": {}}
+        # Keep the last successful result instead of flashing an N/A panel.
+        weather = get_cached_weather() or get_empty_weather()
 
     try:
         calendar = future_calendar.result(timeout=5)
     except:
         calendar = {"date_str": "--", "weekday": "--", "lunar": "--"}
+
+    try:
+        agenda = future_agenda.result(timeout=25)
+    except Exception as e:
+        print(f"Calendar Timeout: {e}")
+        agenda = get_cached_week_agenda() or get_empty_week_agenda()
 
     try:
         news = future_news.result(timeout=15)
@@ -82,6 +104,7 @@ def dashboard():
                            weather=weather, 
                            finance=finance_data, 
                            calendar=calendar, 
+                           agenda=agenda,
                            news=news,
                            updated_at=datetime.datetime.now(ZoneInfo(Config.TIMEZONE)).strftime("%H:%M"),
                            config=Config)

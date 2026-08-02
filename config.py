@@ -6,6 +6,18 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+
+def _env_bool(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_list(name):
+    return [item.strip() for item in os.environ.get(name, "").split(",") if item.strip()]
+
+
 class Config:
     # --- Server Configuration ---
     # Note: Port/Host are often handled by the WSGI server or docker-compose, 
@@ -20,8 +32,9 @@ class Config:
     TIMEZONE = os.environ.get("TIMEZONE", "Asia/Singapore")
 
     # --- Screen Configuration ---
-    SCREEN_WIDTH = int(os.environ.get("SCREEN_WIDTH", 1680))
-    SCREEN_HEIGHT = int(os.environ.get("SCREEN_HEIGHT", 1264))
+    # Kindle Scribe landscape resolution
+    SCREEN_WIDTH = int(os.environ.get("SCREEN_WIDTH", 2480))
+    SCREEN_HEIGHT = int(os.environ.get("SCREEN_HEIGHT", 1860))
     
     # --- Renderer Configuration ---
     # Timeout for page loading in milliseconds
@@ -36,13 +49,35 @@ class Config:
     CACHE_TTL_FINANCE = int(os.environ.get("CACHE_TTL_FINANCE", 900))     # 15 minutes
     CACHE_TTL_NEWS = int(os.environ.get("CACHE_TTL_NEWS", 300))           # 5 minutes
     CACHE_TTL_RENDER = int(os.environ.get("CACHE_TTL_RENDER", 60))        # 1 minute
+    CACHE_TTL_CALENDAR = int(os.environ.get("CACHE_TTL_CALENDAR", 300))   # 5 minutes
+
+    # --- Week Calendar Configuration ---
+    CALENDAR_WEEK_START = os.environ.get("CALENDAR_WEEK_START", "SUNDAY").upper()
+    CALENDAR_MAX_EVENTS_PER_DAY = int(os.environ.get("CALENDAR_MAX_EVENTS_PER_DAY", 6))
+
+    # Apple iCloud CalDAV. A blank APPLE_CALENDAR_NAMES selects every calendar.
+    APPLE_CALENDAR_ENABLED = _env_bool("APPLE_CALENDAR_ENABLED", False)
+    APPLE_CALDAV_URL = os.environ.get("APPLE_CALDAV_URL", "https://caldav.icloud.com")
+    APPLE_ID = os.environ.get("APPLE_ID", "")
+    APPLE_APP_PASSWORD = os.environ.get("APPLE_APP_PASSWORD", "")
+    APPLE_CALENDAR_NAMES = _env_list("APPLE_CALENDAR_NAMES")
+    APPLE_PRIVATE_CALENDAR_NAMES = _env_list("APPLE_PRIVATE_CALENDAR_NAMES")
+
+    # UGA Microsoft 365 default calendar through Microsoft Graph.
+    MICROSOFT_CALENDAR_ENABLED = _env_bool("MICROSOFT_CALENDAR_ENABLED", False)
+    MICROSOFT_CLIENT_ID = os.environ.get("MICROSOFT_CLIENT_ID", "")
+    MICROSOFT_TENANT_ID = os.environ.get("MICROSOFT_TENANT_ID", "organizations")
+    MICROSOFT_TOKEN_CACHE_FILE = os.environ.get(
+        "MICROSOFT_TOKEN_CACHE_FILE", "/data/microsoft-token-cache.json"
+    )
 
     # --- Finance Configuration ---
     # Expected format: JSON list of dicts or just a comma-separated list of symbols for defaults
     # If using formatted string in env: '[{"symbol": "SGDCNY=X", "name": "SGD/CNY"}, ...]'
     # OR simple comma separated: "SGDCNY=X,BTC-USD" (will use symbol as name)
-    FINANCE_TICKERS_RAW = os.environ.get("FINANCE_TICKERS", 
-        '[{"symbol": "SGDCNY=X", "name": "SGD/CNY"}, {"symbol": "VWRA.L", "name": "VWRA"}, {"symbol": "^IXIC", "name": "NASDAQ"}]'
+    FINANCE_TICKERS_RAW = os.environ.get(
+        "FINANCE_TICKERS",
+        '[{"symbol":"SPCX","name":"SpaceX"},{"symbol":"SQQQ","name":"SQQQ"},{"symbol":"SOXS","name":"SOXS"},{"symbol":"BTC-USD","name":"比特币"},{"symbol":"CNY=X","name":"美元/人民币"},{"symbol":"^VIX","name":"VIX"}]'
     )
     
     @staticmethod

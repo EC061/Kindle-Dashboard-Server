@@ -13,30 +13,10 @@ from matplotlib.figure import Figure
 import time
 import threading
 import math
+import copy
 
+from cache_utils import SimpleCache
 from config import Config
-
-# --- Caching Utility ---
-class SimpleCache:
-    def __init__(self, ttl_seconds):
-        self.ttl = ttl_seconds
-        self.cache = {}
-        self.lock = threading.Lock()
-
-    def get(self, key):
-        with self.lock:
-            item = self.cache.get(key)
-            if item:
-                val, timestamp = item
-                if time.time() - timestamp < self.ttl:
-                    return val
-                else:
-                    del self.cache[key]
-        return None
-
-    def set(self, key, value):
-        with self.lock:
-            self.cache[key] = (value, time.time())
 
 # Caches
 weather_cache = SimpleCache(Config.CACHE_TTL_WEATHER)
@@ -73,6 +53,21 @@ def map_wmo_to_text(code):
     else:
         return mapping_cn.get(code, ("未知", "02d"))
 
+
+def weather_icon_symbol(icon_code):
+    """Return a high-contrast glyph that is safe to render without a CDN."""
+    symbol_by_icon = {
+        "01": "☀",
+        "02": "◒",
+        "04": "☁",
+        "09": "☂",
+        "10": "☂",
+        "11": "ϟ",
+        "13": "❄",
+        "50": "≋",
+    }
+    return symbol_by_icon.get(str(icon_code)[:2], "◒")
+
 def get_distance(lat1, lon1, lat2, lon2):
     return math.sqrt((lat1 - lat2)**2 + (lon1 - lon2)**2)
 
@@ -81,25 +76,47 @@ def get_distance(lat1, lon1, lat2, lon2):
 def get_location_name(lat, lon):
     return Config.CITY_NAME
 
-def get_weather(lat=Config.LATITUDE, lon=Config.LONGITUDE):
-    cached = weather_cache.get(f'weather_data_{lat}_{lon}')
-    if cached: return cached
-
-    weather_data = {
-        "location": {"name": get_location_name(lat, lon)}, 
+def get_empty_weather(lat=Config.LATITUDE, lon=Config.LONGITUDE):
+    return {
+        "location": {"name": get_location_name(lat, lon)},
         "current": {
-            "temp": "--", 
-            "humidity": "--", 
-            "desc": "N/A", 
-            "icon": "", 
+            "temp": "--",
+            "humidity": "--",
+            "desc": "N/A",
+            "icon": "",
+            "symbol": "◒",
             "rain_chance": "--",
+            "daily_rain_chance": "--",
             "uv": "--",
             "aqi": "--",
-            "aqi_level": "未知" if Config.LANGUAGE != 'EN' else "Unknown"
+            "aqi_level": "未知" if Config.LANGUAGE != 'EN' else "Unknown",
+            "high_low": "",
+            "alert": "",
+            "has_warning": False,
+            "upcoming_alerts": []
         },
         "forecast": [],
-        "tomorrow": {"label": "", "icon": "", "temp": "", "desc": ""}
+        "tomorrow": {
+            "label": "",
+            "icon": "",
+            "symbol": "◒",
+            "temp": "",
+            "desc": "",
+            "rain_chance": "--"
+        }
     }
+
+def get_cached_weather(lat=Config.LATITUDE, lon=Config.LONGITUDE):
+    """Return the last successful weather result regardless of its age."""
+    cached = weather_cache.get_stale(f'weather_data_{lat}_{lon}')
+    return copy.deepcopy(cached) if cached is not None else None
+
+def get_weather(lat=Config.LATITUDE, lon=Config.LONGITUDE):
+    cache_key = f'weather_data_{lat}_{lon}'
+    cached = weather_cache.get(cache_key)
+    if cached: return cached
+
+    weather_data = get_empty_weather(lat, lon)
 
     try:
         # Open-Meteo Weather API with UV index
@@ -109,14 +126,18 @@ def get_weather(lat=Config.LATITUDE, lon=Config.LONGITUDE):
             "longitude": lon,
             "current": "temperature_2m,relative_humidity_2m,weather_code,uv_index",
             "hourly": "temperature_2m,weather_code,precipitation_probability",
-            "daily": "weather_code,temperature_2m_max,temperature_2m_min,uv_index_max",
+            "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max",
             "timezone": Config.TIMEZONE
         }
         
-        resp = requests.get(url, params=params, timeout=10).json()
+        weather_response = requests.get(url, params=params, timeout=10)
+        weather_response.raise_for_status()
+        resp = weather_response.json()
         
         # 1. Current Weather
         current = resp.get("current", {})
+        if current.get("time") is None or current.get("temperature_2m") is None:
+            raise ValueError("Weather response is missing current conditions")
         temp = round(current.get("temperature_2m", 0))
         hum = current.get("relative_humidity_2m", 0)
         code = current.get("weather_code", 0)
@@ -127,6 +148,7 @@ def get_weather(lat=Config.LATITUDE, lon=Config.LONGITUDE):
         weather_data['current']['humidity'] = f"{hum}%"
         weather_data['current']['desc'] = desc_text
         weather_data['current']['icon'] = icon
+        weather_data['current']['symbol'] = weather_icon_symbol(icon)
         weather_data['current']['uv'] = round(uv_index, 1) if uv_index else 0
         
         # Get AQI from Open-Meteo Air Quality API
@@ -138,7 +160,9 @@ def get_weather(lat=Config.LATITUDE, lon=Config.LONGITUDE):
                 "current": "pm2_5,pm10,us_aqi",
                 "timezone": Config.TIMEZONE
             }
-            aqi_resp = requests.get(aqi_url, params=aqi_params, timeout=10).json()
+            aqi_response = requests.get(aqi_url, params=aqi_params, timeout=10)
+            aqi_response.raise_for_status()
+            aqi_resp = aqi_response.json()
             aqi_current = aqi_resp.get("current", {})
             us_aqi = aqi_current.get("us_aqi", 0)
             weather_data['current']['aqi'] = us_aqi if us_aqi else "--"
@@ -166,19 +190,28 @@ def get_weather(lat=Config.LATITUDE, lon=Config.LONGITUDE):
         except Exception as e:
             print(f"AQI Error: {e}")
         
-        # Rain chance
-        hourly = resp.get("hourly", {})
-        precip_probs = hourly.get("precipitation_probability", [])
-        current_rain_prob = precip_probs[0] if precip_probs else 0
-        weather_data['current']['rain_chance'] = f"{current_rain_prob}%"
-
         # 2. Hourly Forecast (Next 3 hours + Smart Logic)
         current_time_str = current.get("time")
         now_dt = datetime.datetime.fromisoformat(current_time_str)
         
+        hourly = resp.get("hourly", {})
         times = hourly.get("time", []) 
         temps = hourly.get("temperature_2m", [])
         codes = hourly.get("weather_code", [])
+        precip_probs = hourly.get("precipitation_probability", [])
+        if not times or not temps or not codes:
+            raise ValueError("Weather response is missing hourly forecast data")
+
+        current_hour_idx = next(
+            (i for i, value in enumerate(times) if value == current_time_str),
+            -1
+        )
+        current_rain_prob = (
+            precip_probs[current_hour_idx]
+            if 0 <= current_hour_idx < len(precip_probs)
+            else 0
+        )
+        weather_data['current']['rain_chance'] = f"{current_rain_prob}%"
         
         def get_data_for_time(target_dt):
             for i, t_str in enumerate(times):
@@ -225,6 +258,7 @@ def get_weather(lat=Config.LATITUDE, lon=Config.LONGITUDE):
                 forecast_items.append({
                     "label": label,
                     "icon": icon,
+                    "symbol": weather_icon_symbol(icon),
                     "temp": round(temps[idx]),
                     "desc": d_desc
                 })
@@ -232,6 +266,7 @@ def get_weather(lat=Config.LATITUDE, lon=Config.LONGITUDE):
                 forecast_items.append({
                     "label": tgt.strftime("%H:00"),
                     "icon": "02d",
+                    "symbol": weather_icon_symbol("02d"),
                     "temp": "--",
                     "desc": "N/A"
                 })
@@ -240,11 +275,15 @@ def get_weather(lat=Config.LATITUDE, lon=Config.LONGITUDE):
 
         # 3. Tomorrow Forecast
         daily = resp.get("daily", {})
+        daily_rain = daily.get('precipitation_probability_max', [])
         
         if len(daily.get("time", [])) >= 1:
             t0_max = round(daily['temperature_2m_max'][0])
             t0_min = round(daily['temperature_2m_min'][0])
             weather_data['current']['high_low'] = f"{t0_max}° / {t0_min}°"
+            weather_data['current']['daily_rain_chance'] = (
+                f"{daily_rain[0]}%" if daily_rain else "--"
+            )
         else:
              weather_data['current']['high_low'] = ""
 
@@ -259,8 +298,10 @@ def get_weather(lat=Config.LATITUDE, lon=Config.LONGITUDE):
             weather_data['tomorrow'] = {
                 "label": label_tmr,
                 "icon": d_icon,
+                "symbol": weather_icon_symbol(d_icon),
                 "temp": f"{t_max}/{t_min}°",
-                "desc": d_desc
+                "desc": d_desc,
+                "rain_chance": f"{daily_rain[1]}%" if len(daily_rain) >= 2 else "--"
             }
 
         # 4. Weather Alert
@@ -363,11 +404,15 @@ def get_weather(lat=Config.LATITUDE, lon=Config.LONGITUDE):
         weather_data['current']['has_warning'] = False 
         weather_data['current']['upcoming_alerts'] = upcoming_alerts[:5]
             
-        weather_cache.set(f'weather_data_{lat}_{lon}', weather_data)
+        weather_cache.set(cache_key, weather_data)
         return weather_data
 
     except Exception as e:
         print(f"Weather Error: {e}")
+        stale = weather_cache.get_stale(cache_key)
+        if stale is not None:
+            print("Using stale weather data after refresh failure")
+            return copy.deepcopy(stale)
         return weather_data
 
 def get_external_news(url):
@@ -380,8 +425,7 @@ def get_external_news(url):
 
     try:
         resp = requests.get(url, timeout=10)
-        if not resp.ok:
-            return []
+        resp.raise_for_status()
         
         items = resp.json()
         
@@ -398,7 +442,7 @@ def get_external_news(url):
         return display_stories
     except Exception as e:
         print(f"External News Error: {e}")
-        return []
+        return news_cache.get_stale(f'external_{url}') or []
 
 
 def get_hacker_news():
@@ -419,8 +463,8 @@ def get_hacker_news():
         top_ids_resp = requests.get('https://hacker-news.firebaseio.com/v0/topstories.json', timeout=5)
         best_ids_resp = requests.get('https://hacker-news.firebaseio.com/v0/beststories.json', timeout=5)
 
-        if not top_ids_resp.ok or not best_ids_resp.ok:
-             return []
+        top_ids_resp.raise_for_status()
+        best_ids_resp.raise_for_status()
              
         top_ids = top_ids_resp.json()[:10]
         best_ids = best_ids_resp.json()[:10]
@@ -578,7 +622,7 @@ def get_hacker_news():
         print(f"HN Error: {e}")
         import traceback
         traceback.print_exc()
-        return []
+        return news_cache.get_stale('hn_top5') or []
 
 yf_lock = threading.Lock()
 
@@ -592,7 +636,7 @@ def generate_sparkline(ticker_symbol):
              hist = yf.download(ticker_symbol, period="5d", interval="60m", progress=False)
         
         if hist is None or hist.empty:
-            return None, "--", 0
+            return finance_cache.get_stale(cache_key) or (None, "--", 0)
             
         try:
              prices = hist['Close'].values.flatten()
@@ -623,7 +667,7 @@ def generate_sparkline(ticker_symbol):
         return result
     except Exception as e:
         print(f"Finance Error {ticker_symbol}: {e}")
-        return None, "--", 0
+        return finance_cache.get_stale(cache_key) or (None, "--", 0)
 
 WEEKDAYS_CN = {
     "Monday": "星期一", "Tuesday": "星期二", "Wednesday": "星期三",

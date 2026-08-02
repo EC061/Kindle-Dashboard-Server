@@ -3,16 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kindle Oasis Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&display=swap" rel="stylesheet">
+    <title>Kindle Scribe Dashboard</title>
+    <link href="{{ url_for('static', filename='dashboard.css') }}" rel="stylesheet">
     <style>
         /* E-Ink Optimization */
         body {
             background-color: black; /* Border Color via Gap */
             color: black;
-            font-family: 'Noto Sans SC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            /* Oasis 2 Landscape Resolution */
+            font-family: 'Noto Sans CJK SC', 'Noto Sans SC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            /* Original design canvas; renderer scales it to Scribe resolution. */
             width: 1680px;
             height: 1264px;
             overflow: hidden;
@@ -44,188 +43,147 @@
     </style>
 </head>
 <body>
+    <!-- Choice C: compact header, full-width seven-day band, news + six tickers. -->
+    <div class="grid grid-cols-[700px_976px] grid-rows-[240px_540px_476px] flex-1 h-full gap-[4px]">
 
-    <!-- Root Flex Container for 50/50 Split -->
-    <!-- Gap is 4px. Body height 1264. Gap 4. 
-         Available height = 1264. 
-         Minus gap 4 = 1260. 
-         Top/Bottom = 630px each. -->
-    <div class="flex flex-col flex-1 h-full gap-[4px]">
-
-        <!-- TOP HALF (50%) -->
-        <div class="flex flex-1 gap-[4px] min-h-0">
-            
-            <!-- 1. Time & Calendar (Top Left) -->
-            <div class="panel w-1/2 flex flex-col justify-between p-8 relative">
-                <!-- Top: Date Info -->
-                <div class="flex flex-row justify-between items-start">
-                    <div>
-                         <div class="text-6xl font-bold mb-2 tracking-wide">
-                            {{ calendar.date_str }}
-                        </div>
-                        <!-- Weekday -->
-                        <div class="{% if config.LANGUAGE == 'EN' %}text-[5.5rem]{% else %}text-[7rem]{% endif %} font-black leading-none mb-3 uppercase tracking-tight">{{ calendar.weekday }}</div>
-                        <div class="text-4xl font-bold mt-1 text-gray-800">{{ calendar.lunar }}</div>
-                    </div>
-                    
-                    <!-- Next Rest/Work Day -->
-                    {% if calendar.next_day %}
-                    <div class="text-right pt-2">
-                         <div class="flex items-baseline justify-end gap-4 mb-2">
-                             <span class="text-4xl font-bold text-gray-600 uppercase tracking-widest">{% if calendar.is_rest_today %}{% if config.LANGUAGE == 'EN' %}Next Work{% else %}下个工作{% endif %}{% else %}{% if config.LANGUAGE == 'EN' %}Next Off{% else %}下个休息{% endif %}{% endif %}</span>
-                             <span class="text-4xl font-bold text-gray-500">{% if config.LANGUAGE == 'EN' %}In {{ calendar.next_day.days_away }} days{% else %}{{ calendar.next_day.days_away }}天后{% endif %}</span>
-                         </div>
-                         <div class="text-6xl font-black leading-none">{{ calendar.next_day.date }}</div>
-                         <div class="text-4xl font-bold mt-2 truncate max-w-[24rem] ml-auto">{{ calendar.next_day.name }}</div>
-                    </div>
-                    {% endif %}
+        <div id="calendar-panel" class="panel col-start-1 row-start-1 flex flex-col px-6 pt-5 pb-3 relative">
+            <div class="flex items-start justify-between gap-4">
+                <div class="flex items-baseline gap-3 min-w-0">
+                    <span class="text-3xl font-bold tracking-wide shrink-0">{{ calendar.date_str }}</span>
+                    <span class="text-4xl font-black leading-none shrink-0">{{ calendar.weekday }}</span>
+                    <span class="text-xl font-bold text-gray-500 truncate">{{ calendar.lunar }}</span>
                 </div>
+                {% if calendar.next_day %}
+                <div class="text-right shrink-0 leading-tight">
+                    <div class="text-2xl font-bold text-gray-500">
+                        {% if calendar.is_rest_today %}{% if config.LANGUAGE == 'EN' %}Next Work{% else %}下个工作{% endif %}{% else %}{% if config.LANGUAGE == 'EN' %}Next Off{% else %}下个休息{% endif %}{% endif %}
+                        · {% if config.LANGUAGE == 'EN' %}{{ calendar.next_day.days_away }}d{% else %}{{ calendar.next_day.days_away }}天{% endif %}
+                    </div>
+                    <div class="text-4xl font-black">{{ calendar.next_day.date }}</div>
+                </div>
+                {% endif %}
+            </div>
+            <div class="h-[4px] bg-black w-full mt-3"></div>
+            <div id="local-time-placeholder" class="flex-grow"></div>
+        </div>
 
-                <!-- Divider -->
-                <div class="h-[4px] bg-black w-full mt-6"></div>
-
-                <!-- Bottom: Reserved for local time (rendered by Kindle) -->
-                <div id="local-time-placeholder" class="flex-grow flex items-center justify-center">
+        <div id="weather-panel" class="panel col-start-2 row-start-1 flex flex-col px-4 py-3 overflow-hidden">
+            <div class="grid grid-cols-[165px_235px_150px_180px_1fr] gap-3 h-[100px] items-center">
+                <div class="min-w-0">
+                    <div class="text-2xl font-black leading-tight line-clamp-2">{{ weather.location.name }}</div>
+                    <div class="text-xl font-bold text-gray-500 mt-1">{% if config.LANGUAGE == 'EN' %}Now{% else %}现在{% endif %}</div>
+                </div>
+                <div class="flex items-center gap-2 min-w-0">
+                    <span class="text-6xl font-black leading-none shrink-0" aria-hidden="true">{{ weather.current.symbol }}</span>
+                    <div class="min-w-0">
+                        <div class="text-5xl font-black leading-none tracking-tighter">{{ weather.current.temp }}°</div>
+                        <div class="text-2xl font-black truncate">{{ weather.current.desc }}</div>
+                    </div>
+                </div>
+                <div class="border-l-2 border-gray-200 pl-3">
+                    <div class="text-xl font-bold text-gray-500">{% if config.LANGUAGE == 'EN' %}Today{% else %}今日{% endif %}</div>
+                    <div class="text-3xl font-black leading-tight">{{ weather.current.high_low }}</div>
+                    <div class="text-xl font-bold">{% if config.LANGUAGE == 'EN' %}Rain{% else %}降雨{% endif %} {{ weather.current.daily_rain_chance }}</div>
+                </div>
+                <div class="border-l-2 border-gray-200 pl-3">
+                    <div class="text-xl font-bold text-gray-500 truncate"><span class="text-2xl text-black mr-1">{{ weather.tomorrow.symbol }}</span>{{ weather.tomorrow.label }} · {{ weather.tomorrow.desc }}</div>
+                    <div class="text-3xl font-black leading-tight">{{ weather.tomorrow.temp }}</div>
+                    <div class="text-xl font-bold">{% if config.LANGUAGE == 'EN' %}Rain{% else %}降雨{% endif %} {{ weather.tomorrow.rain_chance }}</div>
+                </div>
+                <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-center border-l-2 border-gray-200 pl-3">
+                    <div class="whitespace-nowrap"><span class="text-base font-bold text-gray-500">{% if config.LANGUAGE == 'EN' %}Hum{% else %}湿{% endif %}</span><span class="text-xl font-black ml-1">{{ weather.current.humidity }}</span></div>
+                    <div class="whitespace-nowrap"><span class="text-base font-bold text-gray-500">UV</span><span class="text-xl font-black ml-1">{{ weather.current.uv }}</span></div>
+                    <div class="whitespace-nowrap"><span class="text-base font-bold text-gray-500">AQI</span><span class="text-xl font-black ml-1">{{ weather.current.aqi }}</span></div>
+                    <div class="whitespace-nowrap"><span class="text-base font-bold text-gray-500">{% if config.LANGUAGE == 'EN' %}Rain{% else %}雨{% endif %}</span><span class="text-xl font-black ml-1">{{ weather.current.rain_chance }}</span></div>
                 </div>
             </div>
-
-            <!-- 2. Weather & Forecast (Top Right) -->
-            <div class="panel w-1/2 flex flex-col p-8 pb-4 justify-between"> 
-                <!-- Top Part: Current Weather -->
-                <div class="flex flex-col flex-grow justify-start pt-2">
-                    <!-- Header Row: City + Environmental Indicators -->
-                    <div class="flex justify-between items-start mb-4">
-                        <!-- Left: City Name (smaller) -->
-                        <div>
-                             <span class="text-4xl font-bold text-gray-700 block">{{ weather.location.name }}</span>
-                        </div>
-                        
-                        <!-- Right: Environmental Indicators Row -->
-                        <div class="flex items-start gap-6">
-                            <!-- Humidity -->
-                            <div class="text-center">
-                                <div class="text-2xl font-bold text-gray-500 mb-1">{% if config.LANGUAGE == 'EN' %}Humid{% else %}湿度{% endif %}</div>
-                                <div class="text-4xl font-black">{{ weather.current.humidity }}</div>
-                            </div>
-                            <!-- UV Index -->
-                            <div class="text-center">
-                                <div class="text-2xl font-bold text-gray-500 mb-1">UV</div>
-                                <div class="text-4xl font-black">{{ weather.current.uv }}</div>
-                            </div>
-                            <!-- AQI -->
-                            <div class="text-center">
-                                <div class="text-2xl font-bold text-gray-500 mb-1">{% if config.LANGUAGE == 'EN' %}AQI{% else %}空气{% endif %}</div>
-                                <div class="text-4xl font-black">{{ weather.current.aqi }}</div>
-                            </div>
-                            <!-- Rain Probability -->
-                            <div class="text-center">
-                                <div class="text-2xl font-bold text-gray-500 mb-1">{% if config.LANGUAGE == 'EN' %}Rain{% else %}降雨{% endif %}</div>
-                                <div class="text-4xl font-black">{{ weather.current.rain_chance }}</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Main Weather Display -->
-                    <div class="flex items-start justify-between px-2 mt-4">
-                        <!-- Left: Icon + Weather Name (Same Line) and Alerts Below -->
-                        <div class="flex flex-col">
-                            <!-- Icon and Weather Name in Same Row -->
-                            <div class="flex items-center">
-                                <img src="http://openweathermap.org/img/wn/{{ weather.current.icon }}@4x.png" class="w-[160px] h-[160px] grayscale invert contrast-125 drop-shadow-sm -ml-6 -my-4">
-                                <span class="text-6xl font-black ml-2">{{ weather.current.desc }}</span>
-                            </div>
-                            
-                            <!-- Future Weather Alerts (48h) -->
-                            <div class="mt-6 ml-8">
-                                {% if weather.current.has_warning %}
-                                <!-- Government Warning: Black background -->
-                                <div class="inline-block text-3xl font-black bg-black text-white px-4 py-2">
-                                    ⚠ {{ weather.current.alert }}
-                                </div>
-                                {% elif weather.current.alert %}
-                                <!-- Rain/Snow forecast -->
-                                <div class="inline-block text-3xl font-bold text-gray-500 px-1 py-1">
-                                    {{ weather.current.alert }}
-                                </div>
-                                {% else %}
-                                <!-- No rain/snow: Gray text -->
-                                <div class="inline-block text-3xl font-bold text-gray-500 px-1 py-1">
-                                    {% if config.LANGUAGE == 'EN' %}No rain/snow recently{% else %}近期无雨雪{% endif %}
-                                </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                        
-                        <!-- Right: Temperature and High/Low (Aligned) -->
-                        <div class="text-right flex flex-col items-end justify-center tabular-nums">
-                            <div class="text-[9rem] font-black leading-[0.85] tracking-tighter">{{ weather.current.temp }}°</div>
-                            <div class="text-4xl font-bold text-gray-500 mt-8 mr-12 tracking-tight">{{ weather.current.high_low }}</div>
-                        </div>
-                    </div>
+            <div class="grid grid-cols-4 flex-1 border-t-2 border-gray-200 mt-2 min-h-0">
+                <div class="flex flex-col justify-center px-3 border-r-2 border-gray-200 min-w-0">
+                    <span class="text-xl font-bold text-gray-500">{% if config.LANGUAGE == 'EN' %}Next rain{% else %}下次降雨{% endif %}</span>
+                    <span class="text-2xl font-black line-clamp-2">{% if weather.current.alert %}{{ weather.current.alert }}{% else %}{% if config.LANGUAGE == 'EN' %}None in 48h{% else %}48小时内无{% endif %}{% endif %}</span>
                 </div>
-
-
-                <!-- Bottom Part: Hourly Forecast + Tomorrow -->
-                <!-- Increased height from 160px to 220px/auto to breathe, but ensured content fits -->
-                <div class="grid grid-cols-4 h-[220px] pb-2 items-end">
-                    <!-- 3 Hourly Slots -->
-                    {% for item in weather.forecast %}
-                    <div class="flex flex-col items-center justify-end h-full border-r-2 border-gray-200 relative px-2 py-1">
-                        <span class="text-3xl font-bold mb-1">{{ item.label }}</span>
-                        <img src="http://openweathermap.org/img/wn/{{ item.icon }}@2x.png" class="w-[70px] h-[70px] grayscale invert contrast-125 mb-0">
-                        <span class="text-5xl font-black mt-0 leading-none">{{ item.temp }}°</span>
-                        <span class="text-3xl font-bold text-gray-500 mt-1 truncate w-full text-center">{{ item.desc }}</span>
+                {% for item in weather.forecast[:3] %}
+                <div class="flex items-center justify-center gap-2 px-2 border-r-2 border-gray-200 last:border-0 min-w-0">
+                    <span class="text-4xl font-black leading-none shrink-0" aria-hidden="true">{{ item.symbol }}</span>
+                    <div class="text-center shrink-0">
+                        <div class="text-xl font-bold text-gray-500">{{ item.label }}</div>
+                        <div class="text-3xl font-black leading-none">{{ item.temp }}°</div>
                     </div>
-                    {% endfor %}
-                    
-                    <!-- Tomorrow -->
-                    <div class="flex flex-col items-center justify-end h-full px-2 py-1">
-                         <span class="text-3xl font-bold mb-1">{{ weather.tomorrow.label }}</span>
-                         <img src="http://openweathermap.org/img/wn/{{ weather.tomorrow.icon }}@2x.png" class="w-[70px] h-[70px] grayscale invert contrast-125 mb-0">
-                         <!-- High/Low -->
-                         <span class="text-5xl font-black mt-0 leading-none">{{ weather.tomorrow.temp }}</span>
-                         <span class="text-3xl font-bold text-gray-500 mt-1 truncate w-full text-center">{{ weather.tomorrow.desc }}</span>
-                    </div>
+                    <div class="text-xl font-bold truncate">{{ item.desc }}</div>
                 </div>
+                {% endfor %}
             </div>
         </div>
 
-        <!-- BOTTOM HALF (50%) -->
-        <div class="flex flex-1 gap-[4px] min-h-0">
+        <div id="week-panel" class="panel col-span-2 row-start-2 flex flex-col overflow-hidden">
+            <div class="h-[46px] flex items-center justify-between px-5 border-b-2 border-gray-200 shrink-0">
+                <div class="flex items-baseline gap-3">
+                    <span class="text-3xl font-black">{% if config.LANGUAGE == 'EN' %}Week{% else %}本周{% endif %}</span>
+                    <span class="text-2xl font-bold text-gray-500">{{ agenda.label }}</span>
+                </div>
+                <span class="text-xl font-bold text-gray-500">iCloud + UGA Microsoft 365 · 5 min</span>
+            </div>
+            <div class="grid grid-cols-7 grid-rows-1 flex-1 min-h-0">
+                {% for day in agenda.days %}
+                <div class="flex flex-col min-w-0 border-r-2 border-gray-200 last:border-0">
+                    <div class="h-[42px] flex items-center justify-center gap-2 shrink-0 {% if day.is_today %}bg-black text-white{% endif %}">
+                        <span class="text-2xl font-black">{{ day.weekday }}</span>
+                        <span class="text-2xl font-bold">{{ day.date }}</span>
+                    </div>
+                    <div class="flex-1 min-h-0 px-2 py-1 space-y-1 overflow-hidden">
+                        {% if day.is_today %}
+                        <div class="h-[20px] flex items-center gap-2" aria-label="{% if config.LANGUAGE == 'EN' %}Current time{% else %}当前时间{% endif %} {{ updated_at }}">
+                            <span class="text-sm font-black tabular-nums shrink-0">{{ updated_at }}</span>
+                            <span class="h-[3px] bg-black flex-1"></span>
+                        </div>
+                        {% endif %}
+                        {% for event in day.events %}
+                        <div class="border-l-4 border-black pl-2 pr-1 py-0.5 min-w-0 {% if event.all_day %}bg-gray-100{% endif %}">
+                            <div class="text-base font-black leading-tight line-clamp-2">{{ event.title }}</div>
+                            {% if event.location %}<div class="text-sm font-bold text-gray-500 truncate">{{ event.location }}</div>{% endif %}
+                            <div class="text-sm font-bold tabular-nums truncate">{{ event.time }}{% if event.duration %} · {{ event.duration }}{% endif %}</div>
+                        </div>
+                        {% endfor %}
+                        {% if not day.events %}<div class="text-3xl font-bold text-gray-300 text-center mt-8">—</div>{% endif %}
+                        {% if day.hidden_count %}<div class="text-lg font-bold text-gray-500 px-2">+{{ day.hidden_count }} {% if config.LANGUAGE == 'EN' %}more{% else %}项{% endif %}</div>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
 
-            <!-- Left: News (65%) -->
-            <div class="panel w-[65%] flex flex-col p-8 pr-10">
+        <div id="news-panel" class="panel col-start-1 row-start-3 flex flex-col p-5 pr-6">
                 <!-- Distribute vertically -->
                 <div class="flex flex-col flex-grow justify-around py-1">
                     {% for story in news[:5] %}
                     {% if story.is_external %}
                     <!-- External News: No index, no divider, meta on right -->
-                    <div class="flex items-center justify-between group py-3 h-[88px]">
+                    <div class="flex flex-1 min-h-0 items-center justify-between group py-2">
                         <div class="flex items-center flex-1 min-w-0 mr-4">
                             <!-- Title only (no numbered index) -->
-                            <span class="hn-story-title text-5xl font-bold text-black leading-tight line-clamp-2 break-words whitespace-normal">
+                            <span class="hn-story-title text-4xl font-bold text-black leading-tight line-clamp-2 break-words whitespace-normal">
                                 {{ story.title }}
                             </span>
                         </div>
                         <!-- Meta info (small gray text on right) -->
-                        <span class="text-3xl font-bold text-gray-500 shrink-0 min-w-[3rem] text-right">
+                        <span class="text-2xl font-bold text-gray-500 shrink-0 min-w-[3rem] text-right">
                              {{ story.meta }}
                         </span>
                     </div>
                     {% else %}
                     <!-- Hacker News: Rank + Title + Score with dividers -->
-                    <div class="flex items-center justify-between group py-3 border-b-2 border-gray-100 last:border-0 h-[88px]"> <!-- Fixed height constraint or consistent padding -->
+                    <div class="flex flex-1 min-h-0 items-center justify-between group py-2 border-b-2 border-gray-100 last:border-0">
                         <div class="flex items-center flex-1 min-w-0 mr-4">
                             <!-- Rank -->
-                            <span class="text-5xl font-black mr-4 min-w-[3rem] text-right text-gray-300 group-hover:text-black leading-none shrink-0">{{ loop.index }}.</span>
+                            <span class="text-4xl font-black mr-3 min-w-[2.5rem] text-right text-gray-300 group-hover:text-black leading-none shrink-0">{{ loop.index }}.</span>
                             
-                            <!-- Title (Dynamic font size: 5xl default, 4xl if wrapped) -->
-                            <span class="hn-story-title text-5xl font-bold text-black leading-tight line-clamp-2 break-words whitespace-normal">
+                            <!-- Title (Dynamic font size: 4xl default, 3xl if wrapped) -->
+                            <span class="hn-story-title text-4xl font-bold text-black leading-tight line-clamp-2 break-words whitespace-normal">
                                 {{ story.title }}
                             </span>
                         </div>
                         <!-- Score (Small gray number, Black if breaking) -->
-                        <span class="text-3xl font-bold {% if story.is_breaking %}text-black{% else %}text-gray-500{% endif %} shrink-0 min-w-[3rem] text-right">
+                        <span class="text-2xl font-bold {% if story.is_breaking %}text-black{% else %}text-gray-500{% endif %} shrink-0 min-w-[3rem] text-right">
                              {{ story.score }}
                         </span>
                     </div>
@@ -234,21 +192,20 @@
                 </div>
             </div>
 
-            <!-- Right: Financials (Remaining 35%) -->
-            <div class="bg-black flex-1 flex flex-col gap-[4px]">
-                {% for item in finance %}
-                <div class="panel flex-1 flex flex-col justify-center px-6 py-2">
+            <div id="finance-panel" class="bg-black col-start-2 row-start-3 min-w-0 gap-[6px] {% if finance|length > 3 %}grid grid-cols-2 grid-rows-3 grid-flow-col{% else %}flex flex-col{% endif %}">
+                {% for item in finance[:6] %}
+                <div class="finance-card panel flex-1 min-w-0 min-h-0 flex flex-col px-4 pt-1 pb-2">
                     <!-- Row 1: Name + Price -->
-                    <div class="flex justify-between items-end mb-2">
-                        <span class="text-4xl font-black leading-none">{{ item.name }}</span>
-                        <span class="text-6xl font-black leading-none tracking-tighter">{{ item.price }}</span>
+                    <div class="flex justify-between items-start min-w-0 mb-1">
+                        <span class="text-3xl font-black leading-none truncate mr-3">{{ item.name }}</span>
+                        <span class="text-4xl font-black leading-none tracking-tighter shrink-0">{{ item.price }}</span>
                     </div>
                     
                     <!-- Row 2: Sparkline + Change -->
                     <!-- Compressed height to prevent cutoff -->
-                    <div class="flex items-end justify-between h-[120px]">
+                    <div class="flex items-end justify-between h-[92px] min-w-0 mt-auto">
                          <!-- Sparkline -->
-                        <div class="flex-grow h-full mr-4 relative">
+                        <div class="flex-grow h-full min-w-0 mr-3 relative">
                             {% if item.chart %}
                             <img src="data:image/png;base64,{{ item.chart }}" class="w-full h-full grayscale contrast-200" style="object-fit: fill;">
                             <!-- Baseline -->
@@ -261,18 +218,15 @@
                        <!-- Change Badge -->
                         <div class="shrink-0 mb-2">
                             {% if item.change >= 0 %}
-                            <span class="text-4xl font-bold bg-black text-white px-3 py-2 block min-w-[150px] text-center">▲ {{ "%.2f"|format(item.change) }}%</span>
+                            <span class="text-2xl font-bold bg-black text-white px-2 py-2 block min-w-[112px] text-center">▲ {{ "%.2f"|format(item.change) }}%</span>
                             {% else %}
-                            <span class="text-4xl font-bold border-b-4 border-black text-black px-1 block min-w-[150px] text-center">▼ {{ "%.2f"|format(item.change) }}%</span>
+                            <span class="text-2xl font-bold border-b-4 border-black text-black px-1 block min-w-[112px] text-center">▼ {{ "%.2f"|format(item.change) }}%</span>
                             {% endif %}
                         </div>
                     </div>
                 </div>
                 {% endfor %}
             </div>
-
-        </div>
-
     </div>
 
     <script>
@@ -286,12 +240,11 @@
                 const lineHeight = parseFloat(style.lineHeight);
                 // Buffer of 10% to account for sub-pixel rendering differences
                 if (title.scrollHeight > lineHeight * 1.1) {
-                    title.classList.remove('text-5xl');
-                    title.classList.add('text-4xl');
+                    title.classList.remove('text-4xl');
+                    title.classList.add('text-3xl');
                 }
             });
         });
     </script>
 </body>
 </html>
-

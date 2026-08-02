@@ -1,0 +1,54 @@
+version: "3.8"
+
+services:
+  kindle-dashboard-server:
+    image: ghcr.io/ec061/kindle-dashboard-server:master
+    container_name: kindle-dashboard-server
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    shm_size: "1gb"
+    volumes:
+      - ./kindle-dashboard-data:/data
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "5000"
+
+      TZ: "America/New_York"
+      TIMEZONE: "America/New_York"
+      LATITUDE: "33.94597"
+      LONGITUDE: "-83.37506"
+      CITY_NAME: "UGA Boyd GRSC"
+
+      SCREEN_WIDTH: "2480"
+      SCREEN_HEIGHT: "1860"
+      LANGUAGE: "CN"
+      HOLIDAY_COUNTRY: "US"
+
+      CACHE_TTL_WEATHER: "300"
+      CACHE_TTL_FINANCE: "300"
+      CACHE_TTL_NEWS: "300"
+      CACHE_TTL_CALENDAR: "300"
+      CACHE_TTL_RENDER: "60"
+
+      WORK_START_HOUR: "0"
+      WORK_END_HOUR: "0"
+
+      FINANCE_TICKERS: >-
+        [{"symbol":"SPCX","name":"SpaceX"},{"symbol":"SQQQ","name":"SQQQ"},{"symbol":"SOXS","name":"SOXS"},{"symbol":"BTC-USD","name":"比特币"},{"symbol":"CNY=X","name":"美元/人民币"},{"symbol":"^VIX","name":"VIX"}]
+      NEWS_EXTERNAL_URL: ""
+
+      CALENDAR_WEEK_START: "SUNDAY"
+      CALENDAR_MAX_EVENTS_PER_DAY: "6"
+
+      APPLE_CALENDAR_ENABLED: "${APPLE_CALENDAR_ENABLED:-false}"
+      APPLE_CALDAV_URL: "https://caldav.icloud.com"
+      APPLE_ID: "${APPLE_ID:-}"
+      APPLE_APP_PASSWORD: "${APPLE_APP_PASSWORD:-}"
+      APPLE_CALENDAR_NAMES: "${APPLE_CALENDAR_NAMES:-}"
+      APPLE_PRIVATE_CALENDAR_NAMES: "${APPLE_PRIVATE_CALENDAR_NAMES:-}"
+
+      MICROSOFT_CALENDAR_ENABLED: "${MICROSOFT_CALENDAR_ENABLED:-true}"
+      MICROSOFT_CLIENT_ID: "${MICROSOFT_CLIENT_ID:-}"
+      MICROSOFT_TENANT_ID: "${MICROSOFT_TENANT_ID:-organizations}"
+      MICROSOFT_TOKEN_CACHE_FILE: "/data/microsoft-token-cache.json"
