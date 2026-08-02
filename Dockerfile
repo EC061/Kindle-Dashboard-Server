@@ -35,22 +35,17 @@ ENV UV_COMPILE_BYTECODE=1
 # Copy project files
 COPY pyproject.toml uv.lock ./
 
-# Install dependencies
-RUN uv sync --frozen --no-install-project --no-dev
+# Install dependencies and Chromium before copying application code. These
+# expensive layers now remain reusable when only the dashboard source changes.
+RUN uv sync --frozen --no-install-project --no-dev && \
+    uv run playwright install chromium
 
 # Copy application code
 COPY . .
 
-# Install the project and Playwright browsers
-RUN uv sync --frozen --no-dev && \
-    uv run playwright install chromium --with-deps
-
 # Expose the port
 EXPOSE 5000
 
-# Run the application
-# Copy watchdog and start script
-COPY uptime_monitor.py start.sh ./
 RUN chmod +x start.sh
 
 # Run the application via start script

@@ -11,4 +11,8 @@ test_*.py
 test_output_*.png
 # uv.lock (unless you want strict parity)
 .env
-
+README*.md
+demo_shot.avif
+docker-compose*.yml
+.env_example
+static/tailwind-input.css
