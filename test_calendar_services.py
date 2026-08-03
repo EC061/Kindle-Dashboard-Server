@@ -34,11 +34,11 @@ class CalendarNormalizationTests(unittest.TestCase):
         self.assertIn(event["title"], {"Busy", "忙碌"})
         self.assertEqual(event["location"], "")
 
-    def test_microsoft_event_keeps_name_location_and_time_range(self):
+    def test_public_apple_event_keeps_name_location_and_time_range(self):
         event = _normalize_event(
-            source="microsoft",
-            event_id="ms-1",
-            calendar_name="Microsoft 365",
+            source="apple",
+            event_id="apple-1",
+            calendar_name="UGA Classes",
             title="CSCI 8000",
             location="Boyd 328",
             start=self.week_start + datetime.timedelta(days=2, hours=9, minutes=55),
@@ -58,9 +58,9 @@ class CalendarNormalizationTests(unittest.TestCase):
         for index in range(7):
             start = self.week_start + datetime.timedelta(days=2, hours=8 + index)
             events.append(_normalize_event(
-                source="microsoft",
-                event_id=f"ms-{index}",
-                calendar_name="Microsoft 365",
+                source="apple",
+                event_id=f"apple-{index}",
+                calendar_name="UGA Classes",
                 title=f"Event {index}",
                 location="Boyd",
                 start=start,

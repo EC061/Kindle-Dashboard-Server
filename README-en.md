@@ -17,7 +17,7 @@ It is intended to be used with a KUAL extension (or other tools) on the Kindle t
     *   **Regional Holidays**: Supports public holiday data for various countries via the `holidays` library.
 *   **Rich Data Display**:
     *   **Weather**: Compact current conditions, today/tomorrow high and low, rain probability, next rain, and the next three hourly forecasts.
-    *   **Weekly Calendar**: A seven-day view combining selected Apple iCloud calendars with the UGA Microsoft 365 default calendar. Apple calendars can be masked as Busy by calendar name.
+    *   **Weekly Calendar**: A seven-day view of selected Apple iCloud calendars. Calendars can be masked as Busy by name.
     *   **Financials**: Real-time tracking of currency, stocks, and crypto with sparklines.
     *   **News**: Top 5 stories from Hacker News, or from a custom external JSON source.
 *   **Automated Rendering**:
@@ -50,10 +50,7 @@ nano .env # Configure location, language, resolution, tickers, etc.
 
 ```bash
 docker pull ghcr.io/ec061/kindle-dashboard-server:master
-# Persist the Microsoft token cache across container updates.
-mkdir -p kindle-dashboard-data
 docker run -p 5000:5000 --env-file .env \
-  -v "$PWD/kindle-dashboard-data:/data" \
   ghcr.io/ec061/kindle-dashboard-server:master
 ```
 
@@ -77,34 +74,9 @@ For Apple iCloud CalDAV:
    APPLE_PRIVATE_CALENDAR_NAMES=Personal
    ```
 
-   A blank `APPLE_CALENDAR_NAMES` includes every Apple calendar. Calendars named in `APPLE_PRIVATE_CALENDAR_NAMES` remain included, but their events display only as `Busy`/`忙碌`, with no title or location. The private list does not affect Microsoft events.
+   A blank `APPLE_CALENDAR_NAMES` includes every Apple calendar. Calendars named in `APPLE_PRIVATE_CALENDAR_NAMES` remain included, but their events display only as `Busy`/`忙碌`, with no title or location. iCloud calendar subscriptions can be included by adding their exact display names to `APPLE_CALENDAR_NAMES`.
 
-For the UGA Microsoft 365 default calendar:
-
-1. In the [Microsoft Entra admin center](https://entra.microsoft.com/), open **App registrations → New registration** and create an application for the UGA organizational directory. If UGA blocks app registration, an administrator must create or approve it.
-2. Open **Authentication → Advanced settings** for the application and set **Allow public client flows** to **Yes**. No client secret or redirect URI is needed for device-code login.
-3. Open **API permissions → Add a permission → Microsoft Graph → Delegated permissions**, add `Calendars.Read`, and complete administrator consent if UGA requires it.
-4. Copy the **Application (client) ID** and **Directory (tenant) ID** from the application's Overview page into `.env`:
-
-   ```dotenv
-   MICROSOFT_CALENDAR_ENABLED=true
-   MICROSOFT_CLIENT_ID=00000000-0000-0000-0000-000000000000
-   MICROSOFT_TENANT_ID=00000000-0000-0000-0000-000000000000
-   ```
-
-   `organizations` can be used instead of a tenant ID for a multi-tenant organizational app. The tenant ID is recommended for a UGA-only registration.
-5. Complete the one-time device login while the persistent `/data` volume is mounted:
-
-   ```bash
-   docker compose -f docker-compose.scribe.yml run --rm kindle-dashboard-server \
-     uv run python microsoft_auth.py
-   ```
-
-Follow the printed URL and code, then sign in with the UGA Microsoft 365 account. Only its **default calendar** is read. Microsoft event names, locations, times, and durations are shown in full.
-
-The refreshable Microsoft token cache is stored with owner-only permissions at `/data/microsoft-token-cache.json`. The Compose file maps it to `./kindle-dashboard-data`, so it survives image updates. To change accounts or recover from a revoked login, stop the service, delete `kindle-dashboard-data/microsoft-token-cache.json`, and run the device-login command again.
-
-After configuring either provider, start the service and check `http://localhost:5000/dashboard`. Provider failures reuse the last successful five-minute cache instead of clearing the week view.
+After configuring iCloud, start the service and check `http://localhost:5000/dashboard`. Provider failures reuse the last successful five-minute cache instead of clearing the week view.
 
 ### 4. Kindle Scribe local overlays
 

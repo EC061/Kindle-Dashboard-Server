@@ -1,25 +1,15 @@
 import copy
 import datetime
-import os
-import threading
-from concurrent.futures import ThreadPoolExecutor
 from zoneinfo import ZoneInfo
 
 import caldav
-import msal
-import requests
 
 from cache_utils import SimpleCache
 from config import Config
 
 
-MICROSOFT_SCOPES = ["Calendars.Read"]
-GRAPH_CALENDAR_VIEW_URL = "https://graph.microsoft.com/v1.0/me/calendar/calendarView"
-
 apple_cache = SimpleCache(Config.CACHE_TTL_CALENDAR)
-microsoft_cache = SimpleCache(Config.CACHE_TTL_CALENDAR)
 agenda_cache = SimpleCache(Config.CACHE_TTL_CALENDAR)
-_microsoft_cache_lock = threading.Lock()
 
 
 class CalendarAuthRequired(RuntimeError):
@@ -164,127 +154,6 @@ def fetch_apple_events(start, end):
     return events
 
 
-def _load_microsoft_token_cache():
-    cache = msal.SerializableTokenCache()
-    path = Config.MICROSOFT_TOKEN_CACHE_FILE
-    try:
-        with open(path, "r", encoding="utf-8") as handle:
-            cache.deserialize(handle.read())
-    except FileNotFoundError:
-        pass
-    return cache
-
-
-def _save_microsoft_token_cache(cache):
-    if not cache.has_state_changed:
-        return
-    path = Config.MICROSOFT_TOKEN_CACHE_FILE
-    directory = os.path.dirname(path) or "."
-    os.makedirs(directory, exist_ok=True)
-    temporary = f"{path}.{os.getpid()}.tmp"
-    with open(temporary, "w", encoding="utf-8") as handle:
-        handle.write(cache.serialize())
-    os.chmod(temporary, 0o600)
-    os.replace(temporary, path)
-
-
-def _microsoft_app(cache):
-    if not Config.MICROSOFT_CLIENT_ID:
-        raise CalendarAuthRequired("MICROSOFT_CLIENT_ID is required")
-    authority = f"https://login.microsoftonline.com/{Config.MICROSOFT_TENANT_ID}"
-    return msal.PublicClientApplication(
-        Config.MICROSOFT_CLIENT_ID,
-        authority=authority,
-        token_cache=cache,
-    )
-
-
-def run_microsoft_device_login(message_callback=print):
-    """Perform one-time device login and persist a refreshable MSAL token."""
-    with _microsoft_cache_lock:
-        cache = _load_microsoft_token_cache()
-        app = _microsoft_app(cache)
-        flow = app.initiate_device_flow(scopes=MICROSOFT_SCOPES)
-        if "user_code" not in flow:
-            raise RuntimeError(f"Could not start Microsoft device login: {flow}")
-        message_callback(flow.get("message", "Complete Microsoft device login."))
-        result = app.acquire_token_by_device_flow(flow)
-        _save_microsoft_token_cache(cache)
-    if "access_token" not in result:
-        raise RuntimeError(
-            result.get("error_description") or result.get("error") or "Microsoft login failed"
-        )
-    return result
-
-
-def _microsoft_access_token():
-    with _microsoft_cache_lock:
-        cache = _load_microsoft_token_cache()
-        app = _microsoft_app(cache)
-        accounts = app.get_accounts()
-        if not accounts:
-            raise CalendarAuthRequired("Run microsoft_auth.py to authorize UGA Microsoft 365")
-        result = app.acquire_token_silent(MICROSOFT_SCOPES, account=accounts[0])
-        _save_microsoft_token_cache(cache)
-    if not result or "access_token" not in result:
-        raise CalendarAuthRequired(
-            (result or {}).get("error_description", "Microsoft authorization expired")
-        )
-    return result["access_token"]
-
-
-def fetch_microsoft_events(start, end):
-    if not Config.MICROSOFT_CALENDAR_ENABLED:
-        return []
-
-    token = _microsoft_access_token()
-    params = {
-        "startDateTime": start.astimezone(datetime.UTC).isoformat(),
-        "endDateTime": end.astimezone(datetime.UTC).isoformat(),
-        "$select": "id,subject,start,end,location,isAllDay,isCancelled",
-        "$orderby": "start/dateTime",
-        "$top": "100",
-    }
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Prefer": 'outlook.timezone="UTC"',
-    }
-
-    values = []
-    url = GRAPH_CALENDAR_VIEW_URL
-    while url:
-        response = requests.get(
-            url,
-            params=params if url == GRAPH_CALENDAR_VIEW_URL else None,
-            headers=headers,
-            timeout=15,
-        )
-        response.raise_for_status()
-        payload = response.json()
-        values.extend(payload.get("value", []))
-        url = payload.get("@odata.nextLink")
-
-    events = []
-    for item in values:
-        if item.get("isCancelled"):
-            continue
-        location = (item.get("location") or {}).get("displayName", "")
-        normalized = _normalize_event(
-            source="microsoft",
-            event_id=item.get("id", ""),
-            calendar_name="Microsoft 365",
-            title=item.get("subject", ""),
-            location=location,
-            start=(item.get("start") or {}).get("dateTime"),
-            end=(item.get("end") or {}).get("dateTime"),
-            all_day=item.get("isAllDay", False),
-            private=False,
-        )
-        if normalized:
-            events.append(normalized)
-    return events
-
-
 def _provider_events(cache, key, fetcher, start, end):
     cached = cache.get(key)
     if cached is not None:
@@ -370,19 +239,9 @@ def get_week_agenda(now=None):
     if cached is not None:
         return copy.deepcopy(cached)
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        apple_future = executor.submit(
-            _provider_events, apple_cache, cache_key, fetch_apple_events, start, end
-        )
-        microsoft_future = executor.submit(
-            _provider_events,
-            microsoft_cache,
-            cache_key,
-            fetch_microsoft_events,
-            start,
-            end,
-        )
-        events = apple_future.result() + microsoft_future.result()
+    events = _provider_events(
+        apple_cache, cache_key, fetch_apple_events, start, end
+    )
 
     events.sort(key=lambda event: (event["start"], event["end"], event["title"]))
     agenda = build_week_agenda(events, start, end)

@@ -14,7 +14,7 @@
     *   **多国节假日**: 集成 `holidays` 库，支持配置不同国家/地区的法定节假日。
 *   **丰富的数据展示**:
     *   **天气预报**: 紧凑显示当前天气、今日/明日高低温和降雨概率、下次降雨时间，以及未来三小时预报。
-    *   **七日日历**: 合并指定的 Apple iCloud 日历与 UGA Microsoft 365 默认日历；可按 Apple 日历名称将活动隐藏为“忙碌”。
+    *   **七日日历**: 显示指定的 Apple iCloud 日历；可按日历名称将活动隐藏为“忙碌”。
     *   **金融市场**: 实时追踪汇率、股票及加密货币走势，生成迷你趋势图 (Sparklines)。
     *   **Hacker News**: 自动抓取热门科技新闻，支持自定义外部新闻源。
 *   **服务端自动化渲染**:
@@ -48,10 +48,7 @@ nano .env # 修改经纬度、语言、分辨率等
 
 ```bash
 docker pull ghcr.io/ec061/kindle-dashboard-server:master
-# 持久保存 Microsoft 登录令牌，容器更新后无需重新登录
-mkdir -p kindle-dashboard-data
 docker run -p 5000:5000 --env-file .env \
-  -v "$PWD/kindle-dashboard-data:/data" \
   ghcr.io/ec061/kindle-dashboard-server:master
 ```
 
@@ -75,34 +72,9 @@ Apple iCloud CalDAV：
    APPLE_PRIVATE_CALENDAR_NAMES=Personal
    ```
 
-   `APPLE_CALENDAR_NAMES` 留空表示全部 Apple 日历。`APPLE_PRIVATE_CALENDAR_NAMES` 中的日历仍会显示，但活动只显示“忙碌”，隐藏标题和地点。该隐私列表不影响 Microsoft 活动。
+   `APPLE_CALENDAR_NAMES` 留空表示全部 Apple 日历。`APPLE_PRIVATE_CALENDAR_NAMES` 中的日历仍会显示，但活动只显示“忙碌”，隐藏标题和地点。iCloud 日历订阅也可以通过把准确的显示名称加入 `APPLE_CALENDAR_NAMES` 来显示。
 
-UGA Microsoft 365 默认日历：
-
-1. 在 [Microsoft Entra 管理中心](https://entra.microsoft.com/) 中打开 **应用注册 → 新注册**，为 UGA 组织目录创建应用。如果 UGA 禁止用户注册应用，需要管理员创建或批准。
-2. 打开应用的 **身份验证 → 高级设置**，将 **允许公共客户端流** 设为 **是**。设备代码登录不需要客户端密钥或重定向 URI。
-3. 打开 **API 权限 → 添加权限 → Microsoft Graph → 委托的权限**，添加 `Calendars.Read`；如 UGA 要求，还需完成管理员同意。
-4. 从应用“概述”页复制 **应用程序（客户端）ID** 和 **目录（租户）ID** 到 `.env`：
-
-   ```dotenv
-   MICROSOFT_CALENDAR_ENABLED=true
-   MICROSOFT_CLIENT_ID=00000000-0000-0000-0000-000000000000
-   MICROSOFT_TENANT_ID=00000000-0000-0000-0000-000000000000
-   ```
-
-   多租户组织应用可以用 `organizations` 代替租户 ID；UGA 专用注册建议使用实际租户 ID。
-5. 挂载持久化 `/data` 卷后，执行一次设备登录：
-
-   ```bash
-   docker compose -f docker-compose.scribe.yml run --rm kindle-dashboard-server \
-     uv run python microsoft_auth.py
-   ```
-
-按终端中显示的网址和代码操作，然后使用 UGA Microsoft 365 账户登录。程序只读取该账户的 **默认日历**，Microsoft 活动的名称、地点、时间和时长会完整显示。
-
-Microsoft 可刷新令牌会以仅文件所有者可读的权限保存在 `/data/microsoft-token-cache.json`。Compose 文件将其映射到 `./kindle-dashboard-data`，因此更新镜像不会丢失登录。如需更换账户或修复已撤销的登录，先停止服务，删除 `kindle-dashboard-data/microsoft-token-cache.json`，再重新执行设备登录命令。
-
-配置任一提供商后，启动服务并访问 `http://localhost:5000/dashboard` 检查。如果提供商暂时失败，界面会继续使用上次成功的五分钟缓存，不会清空周视图。
+配置 iCloud 后，启动服务并访问 `http://localhost:5000/dashboard` 检查。如果提供商暂时失败，界面会继续使用上次成功的五分钟缓存，不会清空周视图。
 
 ### 4. Kindle Scribe 本地叠加信息
 

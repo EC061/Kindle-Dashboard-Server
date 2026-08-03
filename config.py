@@ -63,14 +63,6 @@ class Config:
     APPLE_CALENDAR_NAMES = _env_list("APPLE_CALENDAR_NAMES")
     APPLE_PRIVATE_CALENDAR_NAMES = _env_list("APPLE_PRIVATE_CALENDAR_NAMES")
 
-    # UGA Microsoft 365 default calendar through Microsoft Graph.
-    MICROSOFT_CALENDAR_ENABLED = _env_bool("MICROSOFT_CALENDAR_ENABLED", False)
-    MICROSOFT_CLIENT_ID = os.environ.get("MICROSOFT_CLIENT_ID", "")
-    MICROSOFT_TENANT_ID = os.environ.get("MICROSOFT_TENANT_ID", "organizations")
-    MICROSOFT_TOKEN_CACHE_FILE = os.environ.get(
-        "MICROSOFT_TOKEN_CACHE_FILE", "/data/microsoft-token-cache.json"
-    )
-
     # --- Finance Configuration ---
     # Expected format: JSON list of dicts or just a comma-separated list of symbols for defaults
     # If using formatted string in env: '[{"symbol": "SGDCNY=X", "name": "SGD/CNY"}, ...]'
