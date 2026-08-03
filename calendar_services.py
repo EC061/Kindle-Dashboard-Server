@@ -255,11 +255,99 @@ def _event_for_day(event, day_start, day_end):
     }
 
 
-def build_week_agenda(events, start, end):
+def _position_timed_events(events, window_start, window_end):
+    """Clip timed events to the visible window and assign overlap columns."""
+    window_minutes = (window_end - window_start).total_seconds() / 60
+    day_start = window_start.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end = day_start + datetime.timedelta(days=1)
+    positioned = []
+
+    for event in events:
+        shown_start = max(event["start"], window_start)
+        shown_end = min(event["end"], window_end)
+        if shown_start >= shown_end:
+            continue
+        # Keep the event's real daily time range in the label even when its box
+        # is clipped at 08:00 or 18:00.
+        rendered = _event_for_day(event, day_start, day_end)
+        rendered.update({
+            "_layout_start": shown_start,
+            "_layout_end": shown_end,
+            "top_pct": round(
+                ((shown_start - window_start).total_seconds() / 60)
+                / window_minutes * 100,
+                4,
+            ),
+            "height_pct": round(
+                ((shown_end - shown_start).total_seconds() / 60)
+                / window_minutes * 100,
+                4,
+            ),
+        })
+        positioned.append(rendered)
+
+    positioned.sort(key=lambda event: (
+        event["_layout_start"], event["_layout_end"], event["title"]
+    ))
+
+    # Events connected by any overlap form a group. Within each group, assign
+    # the first free column, then give every event an equal share of the width.
+    groups = []
+    group = []
+    group_end = None
+    for event in positioned:
+        if group and event["_layout_start"] >= group_end:
+            groups.append(group)
+            group = []
+            group_end = None
+        group.append(event)
+        group_end = max(group_end, event["_layout_end"]) if group_end else event["_layout_end"]
+    if group:
+        groups.append(group)
+
+    for group in groups:
+        column_ends = []
+        for event in group:
+            column = next((
+                index for index, column_end in enumerate(column_ends)
+                if column_end <= event["_layout_start"]
+            ), None)
+            if column is None:
+                column = len(column_ends)
+                column_ends.append(event["_layout_end"])
+            else:
+                column_ends[column] = event["_layout_end"]
+            event["_layout_column"] = column
+
+        column_count = max(1, len(column_ends))
+        for event in group:
+            event["left_pct"] = round(
+                event.pop("_layout_column") / column_count * 100, 4
+            )
+            event["width_pct"] = round(100 / column_count, 4)
+            event.pop("_layout_start")
+            event.pop("_layout_end")
+
+    return positioned
+
+
+def build_week_agenda(events, start, end, now=None):
     weekday_cn = ["一", "二", "三", "四", "五", "六", "日"]
     weekday_en = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     days = []
-    now = datetime.datetime.now(ZoneInfo(Config.TIMEZONE))
+    timezone = ZoneInfo(Config.TIMEZONE)
+    now = now or datetime.datetime.now(timezone)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone)
+    else:
+        now = now.astimezone(timezone)
+
+    grid_start_hour = max(0, min(23, Config.CALENDAR_DAY_START_HOUR))
+    grid_end_hour = max(
+        grid_start_hour + 1,
+        min(24, Config.CALENDAR_DAY_END_HOUR),
+    )
+    grid_minutes = (grid_end_hour - grid_start_hour) * 60
 
     for offset in range(7):
         day_start = start + datetime.timedelta(days=offset)
@@ -269,7 +357,27 @@ def build_week_agenda(events, start, end):
             if event["start"] < day_end and event["end"] > day_start
         ]
         day_events.sort(key=lambda event: (not event["all_day"], event["start"], event["title"]))
+        all_day_events = [
+            _event_for_day(event, day_start, day_end)
+            for event in day_events if event["all_day"]
+        ]
+        window_start = day_start.replace(hour=grid_start_hour)
+        window_end = day_start + datetime.timedelta(hours=grid_end_hour)
+        timed_events = _position_timed_events(
+            [event for event in day_events if not event["all_day"]],
+            window_start,
+            window_end,
+        )
+
+        grid_events = all_day_events + timed_events
         visible = day_events[:Config.CALENDAR_MAX_EVENTS_PER_DAY]
+        is_today = day_start.date() == now.date()
+        current_time_pct = None
+        if is_today and window_start <= now <= window_end:
+            current_time_pct = round(
+                ((now - window_start).total_seconds() / 60) / grid_minutes * 100,
+                4,
+            )
         days.append({
             "weekday": (
                 weekday_en[day_start.weekday()]
@@ -277,15 +385,33 @@ def build_week_agenda(events, start, end):
                 else weekday_cn[day_start.weekday()]
             ),
             "date": str(day_start.day),
-            "is_today": day_start.date() == now.date(),
+            "is_today": is_today,
             "events": [_event_for_day(event, day_start, day_end) for event in visible],
             "hidden_count": max(0, len(day_events) - len(visible)),
+            "all_day_events": all_day_events,
+            "timed_events": timed_events,
+            "outside_count": max(0, len(day_events) - len(grid_events)),
+            "current_time_pct": current_time_pct,
         })
 
     return {
         "label": f"{start:%m/%d}–{(end - datetime.timedelta(days=1)):%m/%d}",
         "days": days,
         "has_events": bool(events),
+        "has_all_day": any(day["all_day_events"] for day in days),
+        "grid_start_hour": grid_start_hour,
+        "grid_end_hour": grid_end_hour,
+        "hour_labels": [
+            {
+                "label": f"{hour:02d}:00",
+                "top_pct": round(
+                    (hour - grid_start_hour)
+                    / (grid_end_hour - grid_start_hour) * 100,
+                    4,
+                ),
+            }
+            for hour in range(grid_start_hour, grid_end_hour + 1)
+        ],
     }
 
 
@@ -328,7 +454,7 @@ def get_week_agenda(now=None):
         events = [event for future in futures for event in future.result()]
 
     events.sort(key=lambda event: (event["start"], event["end"], event["title"]))
-    agenda = build_week_agenda(events, start, end)
+    agenda = build_week_agenda(events, start, end, now=now)
     agenda_cache.set(cache_key, agenda)
     return agenda
 

@@ -122,34 +122,62 @@
                     <span class="text-3xl font-black">{% if config.LANGUAGE == 'EN' %}Week{% else %}本周{% endif %}</span>
                     <span class="text-2xl font-bold text-gray-500">{{ agenda.label }}</span>
                 </div>
-                <span class="text-xl font-bold text-gray-500">iCloud + ICS · 5 min</span>
+                <span class="text-xl font-bold text-gray-500">{{ "%02d:00"|format(agenda.grid_start_hour) }}–{{ "%02d:00"|format(agenda.grid_end_hour) }} · iCloud + ICS</span>
             </div>
-            <div class="grid grid-cols-7 grid-rows-1 flex-1 min-h-0">
+
+            <!-- Day headings share the same 64px time gutter as the hourly grid. -->
+            <div class="shrink-0 border-b-2 border-gray-200" style="height: 38px; display: grid; grid-template-columns: 64px repeat(7, minmax(0, 1fr));">
+                <div class="border-r-2 border-gray-200"></div>
                 {% for day in agenda.days %}
-                <div class="flex flex-col min-w-0 border-r-2 border-gray-200 last:border-0">
-                    <div class="h-[42px] flex items-center justify-center gap-2 shrink-0 {% if day.is_today %}bg-black text-white{% endif %}">
-                        <span class="text-2xl font-black">{{ day.weekday }}</span>
-                        <span class="text-2xl font-bold">{{ day.date }}</span>
-                    </div>
-                    <div class="flex-1 min-h-0 px-2 py-1 space-y-1 overflow-hidden">
-                        {% if day.is_today %}
-                        <div class="h-[20px] flex items-center gap-2" aria-label="{% if config.LANGUAGE == 'EN' %}Current time{% else %}当前时间{% endif %} {{ updated_at }}">
-                            <span class="text-sm font-black tabular-nums shrink-0">{{ updated_at }}</span>
-                            <span class="h-[3px] bg-black flex-1"></span>
-                        </div>
-                        {% endif %}
-                        {% for event in day.events %}
-                        <div class="border-l-4 border-black pl-2 pr-1 py-0.5 min-w-0 {% if event.all_day %}bg-gray-100{% endif %}">
-                            <div class="text-base font-black leading-tight line-clamp-2">{{ event.title }}</div>
-                            {% if event.location %}<div class="text-sm font-bold text-gray-500 truncate">{{ event.location }}</div>{% endif %}
-                            <div class="text-sm font-bold tabular-nums truncate">{{ event.time }}{% if event.duration %} · {{ event.duration }}{% endif %}</div>
-                        </div>
-                        {% endfor %}
-                        {% if not day.events %}<div class="text-3xl font-bold text-gray-300 text-center mt-8">—</div>{% endif %}
-                        {% if day.hidden_count %}<div class="text-lg font-bold text-gray-500 px-2">+{{ day.hidden_count }} {% if config.LANGUAGE == 'EN' %}more{% else %}项{% endif %}</div>{% endif %}
+                <div class="flex items-center justify-center gap-2 min-w-0 border-r-2 border-gray-200 last:border-0 {% if day.is_today %}bg-black text-white{% endif %}">
+                    <span class="text-xl font-black">{{ day.weekday }}</span>
+                    <span class="text-xl font-bold">{{ day.date }}</span>
+                </div>
+                {% endfor %}
+            </div>
+
+            {% if agenda.has_all_day %}
+            <div class="shrink-0 border-b-2 border-gray-200" style="height: 34px; display: grid; grid-template-columns: 64px repeat(7, minmax(0, 1fr));">
+                <div class="flex items-center justify-center border-r-2 border-gray-200 text-sm font-black text-gray-500">
+                    {% if config.LANGUAGE == 'EN' %}All day{% else %}全天{% endif %}
+                </div>
+                {% for day in agenda.days %}
+                <div class="flex items-center min-w-0 px-1 border-r-2 border-gray-200 last:border-0 bg-gray-100">
+                    <div class="text-sm font-black truncate">
+                        {% for event in day.all_day_events %}{{ event.title }}{% if not loop.last %} · {% endif %}{% endfor %}
                     </div>
                 </div>
                 {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- A proportional 08:00–18:00 grid. Event boxes are clipped to
+                 the visible hours and overlapping events share the day width. -->
+            <div class="relative flex-1 min-h-0 overflow-hidden">
+                {% for hour in agenda.hour_labels %}
+                <div class="absolute border-t-2 border-gray-200" style="left: 64px; right: 0; top: {{ hour.top_pct }}%;"></div>
+                <div class="absolute text-sm font-black tabular-nums text-gray-500 text-right" style="left: 0; width: 58px; top: {{ hour.top_pct }}%; transform: translateY({% if loop.first %}0{% elif loop.last %}-100%{% else %}-50%{% endif %});">
+                    {{ hour.label }}
+                </div>
+                {% endfor %}
+
+                <div class="absolute" style="left: 64px; right: 0; top: 0; bottom: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));">
+                    {% for day in agenda.days %}
+                    <div class="relative min-w-0 border-r-2 border-gray-200 last:border-0">
+                        {% if day.is_today and calendar_current_time_pct is not none %}
+                        <div aria-label="{% if config.LANGUAGE == 'EN' %}Current time{% else %}当前时间{% endif %} {{ updated_at }}" style="position: absolute; left: 0; right: 0; top: {{ calendar_current_time_pct }}%; height: 3px; background: black; z-index: 3;"></div>
+                        {% endif %}
+
+                        {% for event in day.timed_events %}
+                        <div style="position: absolute; box-sizing: border-box; overflow: hidden; z-index: 2; background: white; border: 2px solid black; padding: 2px 3px; top: calc({{ event.top_pct }}% + 1px); height: max(10px, calc({{ event.height_pct }}% - 2px)); left: calc({{ event.left_pct }}% + 1px); width: calc({{ event.width_pct }}% - 2px);">
+                            <div class="truncate" style="font-size: 13px; line-height: 1.05; font-weight: 900;">{{ event.title }}</div>
+                            {% if event.location %}<div class="truncate text-gray-500" style="font-size: 11px; line-height: 1.05; font-weight: 700;">{{ event.location }}</div>{% endif %}
+                            <div class="truncate tabular-nums" style="font-size: 11px; line-height: 1.05; font-weight: 700;">{{ event.time }}{% if event.duration %} · {{ event.duration }}{% endif %}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
         </div>
 

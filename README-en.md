@@ -17,7 +17,7 @@ It is intended to be used with a KUAL extension (or other tools) on the Kindle t
     *   **Regional Holidays**: Supports public holiday data for various countries via the `holidays` library.
 *   **Rich Data Display**:
     *   **Weather**: Compact current conditions, today/tomorrow high and low, rain probability, next rain, and the next three hourly forecasts.
-    *   **Weekly Calendar**: A seven-day view combining selected Apple iCloud calendars and multiple read-only ICS subscription feeds. Calendars can be masked as Busy.
+    *   **Weekly Calendar**: An 08:00–18:00 proportional time grid with side-by-side overlapping events, combining selected Apple iCloud calendars and multiple read-only ICS feeds. Calendars can be masked as Busy.
     *   **Financials**: Real-time tracking of currency, stocks, and crypto with sparklines.
     *   **News**: Top 5 stories from Hacker News, or from a custom external JSON source.
 *   **Automated Rendering**:
@@ -59,6 +59,7 @@ The ready-to-edit Scribe/UGA Compose example is in `docker-compose.scribe.yml`.
 ### 3. Calendar setup
 
 Calendar data is refreshed every five minutes (`CACHE_TTL_CALENDAR=300`). A one-minute image refresh reuses the current calendar cache between provider refreshes.
+The week view positions events on a proportional 08:00–18:00 grid by default. Change the visible range with `CALENDAR_DAY_START_HOUR` and `CALENDAR_DAY_END_HOUR`. Overlapping events share the day column, and the current-time line advances with each one-minute render.
 
 For Apple iCloud CalDAV:
 

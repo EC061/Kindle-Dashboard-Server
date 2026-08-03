@@ -78,6 +78,88 @@ class CalendarNormalizationTests(unittest.TestCase):
         self.assertEqual(len(agenda["days"][2]["events"]), 6)
         self.assertEqual(agenda["days"][2]["hidden_count"], 1)
 
+    def test_timed_events_use_proportional_8_to_18_positions(self):
+        event = _normalize_event(
+            source="apple",
+            event_id="positioned",
+            calendar_name="UGA Classes",
+            title="Cloud Computing",
+            location="Boyd 328",
+            start=self.week_start + datetime.timedelta(days=2, hours=9),
+            end=self.week_start + datetime.timedelta(days=2, hours=10, minutes=30),
+        )
+
+        with (
+            patch.object(Config, "CALENDAR_DAY_START_HOUR", 8),
+            patch.object(Config, "CALENDAR_DAY_END_HOUR", 18),
+        ):
+            agenda = build_week_agenda([event], self.week_start, self.week_end)
+
+        rendered = agenda["days"][2]["timed_events"][0]
+        self.assertEqual(rendered["top_pct"], 10.0)
+        self.assertEqual(rendered["height_pct"], 15.0)
+        self.assertEqual(rendered["left_pct"], 0.0)
+        self.assertEqual(rendered["width_pct"], 100.0)
+
+    def test_overlapping_events_share_the_day_column(self):
+        starts = [(9, 0, 60), (9, 30, 90), (12, 0, 60)]
+        events = []
+        for index, (hour, minute, duration) in enumerate(starts):
+            start = self.week_start + datetime.timedelta(
+                days=2, hours=hour, minutes=minute
+            )
+            events.append(_normalize_event(
+                source="apple",
+                event_id=f"overlap-{index}",
+                calendar_name="UGA Classes",
+                title=f"Event {index}",
+                location="Boyd",
+                start=start,
+                end=start + datetime.timedelta(minutes=duration),
+            ))
+
+        agenda = build_week_agenda(events, self.week_start, self.week_end)
+        rendered = agenda["days"][2]["timed_events"]
+
+        self.assertEqual([event["width_pct"] for event in rendered], [50.0, 50.0, 100.0])
+        self.assertEqual([event["left_pct"] for event in rendered], [0.0, 50.0, 0.0])
+
+    def test_events_are_clipped_to_grid_but_keep_real_time_label(self):
+        early = _normalize_event(
+            source="apple",
+            event_id="early",
+            calendar_name="UGA Classes",
+            title="Early meeting",
+            location="Boyd",
+            start=self.week_start + datetime.timedelta(days=2, hours=7, minutes=30),
+            end=self.week_start + datetime.timedelta(days=2, hours=8, minutes=30),
+        )
+        evening = _normalize_event(
+            source="apple",
+            event_id="evening",
+            calendar_name="UGA Classes",
+            title="Evening meeting",
+            location="Boyd",
+            start=self.week_start + datetime.timedelta(days=2, hours=18, minutes=30),
+            end=self.week_start + datetime.timedelta(days=2, hours=19, minutes=30),
+        )
+
+        agenda = build_week_agenda([early, evening], self.week_start, self.week_end)
+        day = agenda["days"][2]
+
+        self.assertEqual(len(day["timed_events"]), 1)
+        self.assertEqual(day["timed_events"][0]["top_pct"], 0.0)
+        self.assertEqual(day["timed_events"][0]["height_pct"], 5.0)
+        self.assertEqual(day["timed_events"][0]["time"], "07:30–08:30")
+        self.assertEqual(day["outside_count"], 1)
+
+    def test_current_time_position_uses_grid_hours(self):
+        now = self.week_start + datetime.timedelta(days=2, hours=13)
+        agenda = build_week_agenda([], self.week_start, self.week_end, now=now)
+
+        self.assertTrue(agenda["days"][2]["is_today"])
+        self.assertEqual(agenda["days"][2]["current_time_pct"], 50.0)
+
 
 class IcsCalendarTests(unittest.TestCase):
     def setUp(self):

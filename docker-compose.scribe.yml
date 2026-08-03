@@ -38,6 +38,8 @@ services:
 
       CALENDAR_WEEK_START: "SUNDAY"
       CALENDAR_MAX_EVENTS_PER_DAY: "6"
+      CALENDAR_DAY_START_HOUR: "8"
+      CALENDAR_DAY_END_HOUR: "18"
 
       APPLE_CALENDAR_ENABLED: "${APPLE_CALENDAR_ENABLED:-false}"
       APPLE_CALDAV_URL: "https://caldav.icloud.com"

@@ -55,6 +55,8 @@ class Config:
     # --- Week Calendar Configuration ---
     CALENDAR_WEEK_START = os.environ.get("CALENDAR_WEEK_START", "SUNDAY").upper()
     CALENDAR_MAX_EVENTS_PER_DAY = int(os.environ.get("CALENDAR_MAX_EVENTS_PER_DAY", 6))
+    CALENDAR_DAY_START_HOUR = int(os.environ.get("CALENDAR_DAY_START_HOUR", 8))
+    CALENDAR_DAY_END_HOUR = int(os.environ.get("CALENDAR_DAY_END_HOUR", 18))
 
     # Apple iCloud CalDAV. A blank APPLE_CALENDAR_NAMES selects every calendar.
     APPLE_CALENDAR_ENABLED = _env_bool("APPLE_CALENDAR_ENABLED", False)

@@ -100,13 +100,28 @@ def dashboard():
             "chart": chart
         })
     
+    rendered_at = datetime.datetime.now(ZoneInfo(Config.TIMEZONE))
+    grid_start_hour = max(0, min(23, Config.CALENDAR_DAY_START_HOUR))
+    grid_end_hour = max(grid_start_hour + 1, min(24, Config.CALENDAR_DAY_END_HOUR))
+    calendar_current_time_pct = None
+    minute_of_day = rendered_at.hour * 60 + rendered_at.minute
+    grid_start_minute = grid_start_hour * 60
+    grid_end_minute = grid_end_hour * 60
+    if grid_start_minute <= minute_of_day <= grid_end_minute:
+        calendar_current_time_pct = round(
+            (minute_of_day - grid_start_minute)
+            / (grid_end_minute - grid_start_minute) * 100,
+            4,
+        )
+
     return render_template('dashboard.html', 
                            weather=weather, 
                            finance=finance_data, 
                            calendar=calendar, 
                            agenda=agenda,
                            news=news,
-                           updated_at=datetime.datetime.now(ZoneInfo(Config.TIMEZONE)).strftime("%H:%M"),
+                           updated_at=rendered_at.strftime("%H:%M"),
+                           calendar_current_time_pct=calendar_current_time_pct,
                            config=Config)
 
 import os
