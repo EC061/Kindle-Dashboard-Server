@@ -1,14 +1,18 @@
 import datetime
+import json
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from zoneinfo import ZoneInfo
 
+import calendar_services
 from cache_utils import SimpleCache
 from calendar_services import (
     _normalize_event,
     _provider_events,
     build_week_agenda,
+    fetch_ics_events,
+    get_week_agenda,
 )
 from config import Config
 
@@ -73,6 +77,132 @@ class CalendarNormalizationTests(unittest.TestCase):
 
         self.assertEqual(len(agenda["days"][2]["events"]), 6)
         self.assertEqual(agenda["days"][2]["hidden_count"], 1)
+
+
+class IcsCalendarTests(unittest.TestCase):
+    def setUp(self):
+        self.timezone = ZoneInfo(Config.TIMEZONE)
+        self.week_start = datetime.datetime(2026, 8, 2, tzinfo=self.timezone)
+        self.week_end = self.week_start + datetime.timedelta(days=7)
+
+    def test_multiple_ics_feeds_are_parsed_from_json(self):
+        configured = [
+            {"name": "UGA Events", "url": "https://example.com/uga.ics"},
+            {"name": "Private", "url": "webcal://example.com/private.ics", "private": True},
+        ]
+        with patch.object(Config, "ICS_CALENDARS_RAW", json.dumps(configured)):
+            feeds = Config.get_ics_calendars()
+
+        self.assertEqual([feed["name"] for feed in feeds], ["UGA Events", "Private"])
+        self.assertFalse(feeds[0]["private"])
+        self.assertTrue(feeds[1]["private"])
+        self.assertEqual(feeds[1]["url"], "https://example.com/private.ics")
+
+    def test_invalid_ics_feed_does_not_remove_valid_feeds(self):
+        configured = [
+            {"name": "UGA Events", "url": "https://example.com/uga.ics"},
+            {"name": "Missing URL"},
+        ]
+        with patch.object(Config, "ICS_CALENDARS_RAW", json.dumps(configured)):
+            feeds = Config.get_ics_calendars()
+
+        self.assertEqual(len(feeds), 1)
+        self.assertEqual(feeds[0]["name"], "UGA Events")
+
+    def test_failed_ics_feed_does_not_hide_another_feed(self):
+        feeds = [
+            {"name": "Unavailable", "url": "https://example.com/down.ics", "private": False},
+            {"name": "UGA Events", "url": "https://example.com/uga.ics", "private": False},
+        ]
+
+        def fetch_feed(feed, _start, _end):
+            if feed["name"] == "Unavailable":
+                raise RuntimeError("temporary outage")
+            return [_normalize_event(
+                source="ics",
+                event_id="uga-event",
+                calendar_name=feed["name"],
+                title="TALENT Project",
+                location="Boyd GRSC",
+                start=self.week_start + datetime.timedelta(days=5, hours=10),
+                end=self.week_start + datetime.timedelta(days=5, hours=11),
+            )]
+
+        with (
+            patch.object(Config, "get_ics_calendars", return_value=feeds),
+            patch("calendar_services.fetch_apple_events", return_value=[]),
+            patch("calendar_services.fetch_ics_events", side_effect=fetch_feed),
+            patch.object(calendar_services, "apple_cache", SimpleCache(300)),
+            patch.object(calendar_services, "ics_cache", SimpleCache(300)),
+            patch.object(calendar_services, "agenda_cache", SimpleCache(300)),
+        ):
+            agenda = get_week_agenda(self.week_start)
+
+        friday_events = agenda["days"][5]["events"]
+        self.assertEqual(len(friday_events), 1)
+        self.assertEqual(friday_events[0]["title"], "TALENT Project")
+
+    @patch("calendar_services.requests.get")
+    def test_ics_feed_expands_recurring_events_within_week(self, mock_get):
+        response = Mock()
+        response.content = b"""BEGIN:VCALENDAR\r
+VERSION:2.0\r
+PRODID:-//Kindle Dashboard Tests//EN\r
+BEGIN:VEVENT\r
+UID:talent-project\r
+DTSTART:20260731T140000Z\r
+DTEND:20260731T150000Z\r
+RRULE:FREQ=WEEKLY;COUNT=3\r
+SUMMARY:TALENT Project\r
+LOCATION:Boyd GRSC\r
+END:VEVENT\r
+END:VCALENDAR\r
+"""
+        response.raise_for_status.return_value = None
+        mock_get.return_value = response
+
+        events = fetch_ics_events(
+            {"name": "UGA Events", "url": "https://example.com/uga.ics", "private": False},
+            self.week_start,
+            self.week_end,
+        )
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["title"], "TALENT Project")
+        self.assertEqual(events[0]["location"], "Boyd GRSC")
+        self.assertEqual(events[0]["start"].date(), datetime.date(2026, 8, 7))
+        mock_get.assert_called_once_with(
+            "https://example.com/uga.ics",
+            headers={"User-Agent": "Kindle-Dashboard-Server/0.1"},
+            timeout=15,
+        )
+
+    @patch("calendar_services.requests.get")
+    def test_private_ics_feed_masks_event_details(self, mock_get):
+        response = Mock()
+        response.content = b"""BEGIN:VCALENDAR\r
+VERSION:2.0\r
+BEGIN:VEVENT\r
+UID:private-event\r
+DTSTART:20260805T140000Z\r
+DTEND:20260805T150000Z\r
+SUMMARY:Sensitive event\r
+LOCATION:Private office\r
+END:VEVENT\r
+END:VCALENDAR\r
+"""
+        response.raise_for_status.return_value = None
+        mock_get.return_value = response
+
+        events = fetch_ics_events(
+            {"name": "Private feed", "url": "https://example.com/private.ics", "private": True},
+            self.week_start,
+            self.week_end,
+        )
+
+        self.assertEqual(len(events), 1)
+        self.assertIn(events[0]["title"], {"Busy", "忙碌"})
+        self.assertEqual(events[0]["location"], "")
 
 
 class CalendarCacheTests(unittest.TestCase):

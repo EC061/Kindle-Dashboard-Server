@@ -1,5 +1,6 @@
 import os
 import ast
+import json
 from dotenv import load_dotenv
 
 
@@ -62,6 +63,41 @@ class Config:
     APPLE_APP_PASSWORD = os.environ.get("APPLE_APP_PASSWORD", "")
     APPLE_CALENDAR_NAMES = _env_list("APPLE_CALENDAR_NAMES")
     APPLE_PRIVATE_CALENDAR_NAMES = _env_list("APPLE_PRIVATE_CALENDAR_NAMES")
+
+    # Read-only iCalendar subscription feeds. Each item may be a URL string or
+    # an object containing name, url, and an optional private flag.
+    ICS_CALENDARS_RAW = os.environ.get("ICS_CALENDARS", "[]")
+
+    @staticmethod
+    def get_ics_calendars():
+        try:
+            configured = json.loads(Config.ICS_CALENDARS_RAW or "[]")
+        except (TypeError, json.JSONDecodeError):
+            print("ICS calendar configuration error: expected a valid JSON array")
+            return []
+        if not isinstance(configured, list):
+            print("ICS calendar configuration error: expected a JSON array")
+            return []
+
+        feeds = []
+        for index, item in enumerate(configured):
+            if isinstance(item, str):
+                item = {"url": item}
+            if not isinstance(item, dict):
+                print(f"ICS calendar configuration: skipping item {index + 1}")
+                continue
+            url = str(item.get("url", "")).strip()
+            if not url:
+                print(f"ICS calendar configuration: item {index + 1} has no URL")
+                continue
+            if url.lower().startswith("webcal://"):
+                url = f"https://{url[9:]}"
+            name = str(item.get("name", "")).strip() or f"ICS {index + 1}"
+            private = item.get("private", False)
+            if isinstance(private, str):
+                private = private.strip().lower() in {"1", "true", "yes", "on"}
+            feeds.append({"name": name, "url": url, "private": bool(private)})
+        return feeds
 
     # --- Finance Configuration ---
     # Expected format: JSON list of dicts or just a comma-separated list of symbols for defaults

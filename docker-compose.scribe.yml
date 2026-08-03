@@ -45,3 +45,6 @@ services:
       APPLE_APP_PASSWORD: "${APPLE_APP_PASSWORD:-}"
       APPLE_CALENDAR_NAMES: "${APPLE_CALENDAR_NAMES:-}"
       APPLE_PRIVATE_CALENDAR_NAMES: "${APPLE_PRIVATE_CALENDAR_NAMES:-}"
+
+      # JSON array of read-only ICS feeds. Keep private URLs in the local .env.
+      ICS_CALENDARS: "${ICS_CALENDARS:-[]}"

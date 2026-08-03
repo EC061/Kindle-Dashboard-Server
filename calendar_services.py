@@ -1,14 +1,21 @@
 import copy
 import datetime
+import hashlib
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from zoneinfo import ZoneInfo
 
 import caldav
+import recurring_ical_events
+import requests
+from icalendar import Calendar
 
 from cache_utils import SimpleCache
 from config import Config
 
 
 apple_cache = SimpleCache(Config.CACHE_TTL_CALENDAR)
+ics_cache = SimpleCache(Config.CACHE_TTL_CALENDAR)
 agenda_cache = SimpleCache(Config.CACHE_TTL_CALENDAR)
 
 
@@ -154,7 +161,57 @@ def fetch_apple_events(start, end):
     return events
 
 
-def _provider_events(cache, key, fetcher, start, end):
+def fetch_ics_events(feed, start, end):
+    try:
+        response = requests.get(
+            feed["url"],
+            headers={"User-Agent": "Kindle-Dashboard-Server/0.1"},
+            timeout=15,
+        )
+        response.raise_for_status()
+    except requests.RequestException as error:
+        # Published ICS URLs are bearer secrets; never include them in logs.
+        raise RuntimeError(
+            f"ICS request failed ({error.__class__.__name__})"
+        ) from error
+    calendar = Calendar.from_ical(response.content)
+    components = recurring_ical_events.of(
+        calendar,
+        skip_bad_series=True,
+    ).between(start, end)
+
+    events = []
+    for component in components:
+        if str(component.get("status", "")).upper() == "CANCELLED":
+            continue
+        dtstart = component.get("dtstart")
+        dtend = component.get("dtend")
+        start_value = getattr(dtstart, "dt", None)
+        end_value = getattr(dtend, "dt", None)
+        all_day = isinstance(start_value, datetime.date) and not isinstance(
+            start_value, datetime.datetime
+        )
+        event_id = str(component.get("uid", ""))
+        recurrence_id = component.get("recurrence-id")
+        if recurrence_id is not None:
+            event_id = f"{event_id}:{getattr(recurrence_id, 'dt', recurrence_id)}"
+        normalized = _normalize_event(
+            source="ics",
+            event_id=event_id,
+            calendar_name=feed["name"],
+            title=str(component.get("summary", "")),
+            location=str(component.get("location", "")),
+            start=start_value,
+            end=end_value,
+            all_day=all_day,
+            private=feed["private"],
+        )
+        if normalized and normalized["start"] < end and normalized["end"] > start:
+            events.append(normalized)
+    return events
+
+
+def _provider_events(cache, key, fetcher, start, end, provider_name=None):
     cached = cache.get(key)
     if cached is not None:
         return copy.deepcopy(cached)
@@ -163,7 +220,7 @@ def _provider_events(cache, key, fetcher, start, end):
         cache.set(key, events)
         return events
     except Exception as error:
-        print(f"Calendar provider error ({key}): {error}")
+        print(f"Calendar provider error ({provider_name or key}): {error}")
         stale = cache.get_stale(key)
         return copy.deepcopy(stale) if stale is not None else []
 
@@ -239,9 +296,36 @@ def get_week_agenda(now=None):
     if cached is not None:
         return copy.deepcopy(cached)
 
-    events = _provider_events(
-        apple_cache, cache_key, fetch_apple_events, start, end
-    )
+    providers = [(
+        apple_cache,
+        cache_key,
+        fetch_apple_events,
+        "iCloud",
+    )]
+    for index, feed in enumerate(Config.get_ics_calendars()):
+        url_digest = hashlib.sha256(feed["url"].encode("utf-8")).hexdigest()[:16]
+        feed_key = f"{cache_key}_ics_{index}_{url_digest}"
+        providers.append((
+            ics_cache,
+            feed_key,
+            partial(fetch_ics_events, feed),
+            f"ICS {feed['name']}",
+        ))
+
+    with ThreadPoolExecutor(max_workers=len(providers)) as executor:
+        futures = [
+            executor.submit(
+                _provider_events,
+                cache,
+                key,
+                fetcher,
+                start,
+                end,
+                provider_name,
+            )
+            for cache, key, fetcher, provider_name in providers
+        ]
+        events = [event for future in futures for event in future.result()]
 
     events.sort(key=lambda event: (event["start"], event["end"], event["title"]))
     agenda = build_week_agenda(events, start, end)

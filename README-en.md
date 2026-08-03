@@ -17,7 +17,7 @@ It is intended to be used with a KUAL extension (or other tools) on the Kindle t
     *   **Regional Holidays**: Supports public holiday data for various countries via the `holidays` library.
 *   **Rich Data Display**:
     *   **Weather**: Compact current conditions, today/tomorrow high and low, rain probability, next rain, and the next three hourly forecasts.
-    *   **Weekly Calendar**: A seven-day view of selected Apple iCloud calendars. Calendars can be masked as Busy by name.
+    *   **Weekly Calendar**: A seven-day view combining selected Apple iCloud calendars and multiple read-only ICS subscription feeds. Calendars can be masked as Busy.
     *   **Financials**: Real-time tracking of currency, stocks, and crypto with sparklines.
     *   **News**: Top 5 stories from Hacker News, or from a custom external JSON source.
 *   **Automated Rendering**:
@@ -74,9 +74,36 @@ For Apple iCloud CalDAV:
    APPLE_PRIVATE_CALENDAR_NAMES=Personal
    ```
 
-   A blank `APPLE_CALENDAR_NAMES` includes every Apple calendar. Calendars named in `APPLE_PRIVATE_CALENDAR_NAMES` remain included, but their events display only as `Busy`/`忙碌`, with no title or location. iCloud calendar subscriptions can be included by adding their exact display names to `APPLE_CALENDAR_NAMES`.
+   A blank `APPLE_CALENDAR_NAMES` includes every CalDAV calendar. Calendars named in `APPLE_PRIVATE_CALENDAR_NAMES` remain included, but their events display only as `Busy`/`忙碌`, with no title or location.
 
-After configuring iCloud, start the service and check `http://localhost:5000/dashboard`. Provider failures reuse the last successful five-minute cache instead of clearing the week view.
+For published or subscribed ICS calendars, configure `ICS_CALENDARS` as a JSON array. Direct fetching is required because subscription calendars shown by Apple Calendar are not always exposed to third-party CalDAV clients:
+
+```dotenv
+ICS_CALENDARS='[{"name":"UGA Events","url":"https://example.com/private-feed.ics"},{"name":"Travel","url":"https://example.com/travel.ics","private":true}]'
+```
+
+Each entry accepts:
+
+* `name`: the name displayed by the dashboard; omitted names become `ICS 1`, `ICS 2`, and so on.
+* `url`: the private HTTPS address of the published ICS feed.
+* `private`: optional; when `true`, event titles and locations are shown only as `Busy`/`忙碌`.
+
+An array of URL strings is also accepted when custom names are not needed:
+
+```dotenv
+ICS_CALENDARS='["https://example.com/one.ics","https://example.com/two.ics"]'
+```
+
+For a QNAP Compose application, the same setting can be entered directly in the local YAML:
+
+```yaml
+ICS_CALENDARS: >-
+  [{"name":"UGA Events","url":"https://example.com/private-feed.ics"}]
+```
+
+Treat every ICS URL as a password: keep it only in the NAS configuration, never commit it or paste it into public logs. A direct ICS feed does not need to be listed in `APPLE_CALENDAR_NAMES`.
+
+After configuring iCloud or ICS feeds, start the service and check `http://localhost:5000/dashboard`. All sources refresh every five minutes. Each source has an independent stale cache, so a temporary failure in one feed does not clear the other calendars.
 
 ### 4. Kindle Scribe local overlays
 

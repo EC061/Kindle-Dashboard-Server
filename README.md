@@ -14,7 +14,7 @@
     *   **多国节假日**: 集成 `holidays` 库，支持配置不同国家/地区的法定节假日。
 *   **丰富的数据展示**:
     *   **天气预报**: 紧凑显示当前天气、今日/明日高低温和降雨概率、下次降雨时间，以及未来三小时预报。
-    *   **七日日历**: 显示指定的 Apple iCloud 日历；可按日历名称将活动隐藏为“忙碌”。
+    *   **七日日历**: 合并指定的 Apple iCloud 日历与多个只读 ICS 订阅源；可将指定日历的活动隐藏为“忙碌”。
     *   **金融市场**: 实时追踪汇率、股票及加密货币走势，生成迷你趋势图 (Sparklines)。
     *   **Hacker News**: 自动抓取热门科技新闻，支持自定义外部新闻源。
 *   **服务端自动化渲染**:
@@ -72,9 +72,36 @@ Apple iCloud CalDAV：
    APPLE_PRIVATE_CALENDAR_NAMES=Personal
    ```
 
-   `APPLE_CALENDAR_NAMES` 留空表示全部 Apple 日历。`APPLE_PRIVATE_CALENDAR_NAMES` 中的日历仍会显示，但活动只显示“忙碌”，隐藏标题和地点。iCloud 日历订阅也可以通过把准确的显示名称加入 `APPLE_CALENDAR_NAMES` 来显示。
+   `APPLE_CALENDAR_NAMES` 留空表示全部 CalDAV 日历。`APPLE_PRIVATE_CALENDAR_NAMES` 中的日历仍会显示，但活动只显示“忙碌”，隐藏标题和地点。
 
-配置 iCloud 后，启动服务并访问 `http://localhost:5000/dashboard` 检查。如果提供商暂时失败，界面会继续使用上次成功的五分钟缓存，不会清空周视图。
+对于已发布或订阅的 ICS 日历，请把 `ICS_CALENDARS` 配置为 JSON 数组。Apple 日历中可见的订阅日历不一定会通过第三方 CalDAV 客户端显示，因此需要由服务端直接读取：
+
+```dotenv
+ICS_CALENDARS='[{"name":"UGA Events","url":"https://example.com/private-feed.ics"},{"name":"Travel","url":"https://example.com/travel.ics","private":true}]'
+```
+
+每个条目支持：
+
+* `name`：仪表盘显示的名称；省略后依次使用 `ICS 1`、`ICS 2`。
+* `url`：已发布 ICS 日历的私密 HTTPS 地址。
+* `private`：可选；设为 `true` 后，活动标题和地点只显示为“忙碌”/`Busy`。
+
+如果不需要自定义名称，也可以直接提供多个 URL：
+
+```dotenv
+ICS_CALENDARS='["https://example.com/one.ics","https://example.com/two.ics"]'
+```
+
+在 QNAP Compose 应用中，也可以直接在本地 YAML 中配置：
+
+```yaml
+ICS_CALENDARS: >-
+  [{"name":"UGA Events","url":"https://example.com/private-feed.ics"}]
+```
+
+ICS URL 相当于密码：只应保存在 NAS 的本地配置中，不要提交到仓库或粘贴到公开日志。直接配置的 ICS 日历不需要再加入 `APPLE_CALENDAR_NAMES`。
+
+配置 iCloud 或 ICS 订阅源后，启动服务并访问 `http://localhost:5000/dashboard` 检查。所有来源每五分钟更新一次；每个来源使用独立的过期缓存，因此单个订阅源暂时失败不会清空其他日历。
 
 ### 4. Kindle Scribe 本地叠加信息
 

@@ -15,4 +15,6 @@ dependencies = [
     "gunicorn>=24.1.1",
     "python-dotenv>=1.2.1",
     "caldav>=3.0,<4",
+    "icalendar>=7.2,<8",
+    "recurring-ical-events>=3.8,<4",
 ]
