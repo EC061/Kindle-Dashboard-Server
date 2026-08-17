@@ -59,6 +59,7 @@ def _as_datetime(value, timezone, *, end=False):
 
 def _normalize_event(
     *, source, event_id, calendar_name, title, location, start, end,
+    notes="",
     all_day=False, private=False
 ):
     timezone = ZoneInfo(Config.TIMEZONE)
@@ -80,6 +81,7 @@ def _normalize_event(
         "calendar_name": calendar_name,
         "title": display_title,
         "location": "" if private else (location or ""),
+        "notes": "" if private else (notes or ""),
         "start": start_dt,
         "end": end_dt,
         "all_day": bool(all_day),
@@ -151,6 +153,7 @@ def fetch_apple_events(start, end):
                     calendar_name=calendar_name,
                     title=str(component.get("summary", "")),
                     location=str(component.get("location", "")),
+                    notes=str(component.get("description", "")),
                     start=start_value,
                     end=end_value,
                     all_day=all_day,
@@ -202,6 +205,7 @@ def fetch_ics_events(feed, start, end):
             calendar_name=feed["name"],
             title=str(component.get("summary", "")),
             location=str(component.get("location", "")),
+            notes=str(component.get("description", "")),
             start=start_value,
             end=end_value,
             all_day=all_day,
@@ -263,6 +267,7 @@ def _event_for_day(event, day_start, day_end):
     return {
         "title": event["title"],
         "location": event["location"],
+        "notes": event.get("notes", ""),
         "time": time_label,
         "duration": duration,
         "all_day": event["all_day"],

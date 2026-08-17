@@ -171,7 +171,7 @@
                         {% for event in day.timed_events %}
                         <div style="position: absolute; box-sizing: border-box; overflow: hidden; z-index: 2; background: white; border: 2px solid black; padding: 2px 3px; top: calc({{ event.top_pct }}% + 1px); height: max(10px, calc({{ event.height_pct }}% - 2px)); left: calc({{ event.left_pct }}% + 1px); width: calc({{ event.width_pct }}% - 2px);">
                             <div class="truncate" style="font-size: 13px; line-height: 1.05; font-weight: 900;">{{ event.title }}</div>
-                            {% if event.location %}<div class="truncate text-gray-500" style="font-size: 11px; line-height: 1.05; font-weight: 700;">{{ event.location }}</div>{% endif %}
+                            {% if event.notes or event.location %}<div class="truncate text-gray-500" style="font-size: 11px; line-height: 1.05; font-weight: 700;">{% if event.notes %}{{ event.notes }}{% if event.location %} · {% endif %}{% endif %}{% if event.location %}{{ event.location }}{% endif %}</div>{% endif %}
                             <div class="truncate tabular-nums" style="font-size: 11px; line-height: 1.05; font-weight: 700;">{{ event.time }}{% if event.duration %} · {{ event.duration }}{% endif %}</div>
                         </div>
                         {% endfor %}

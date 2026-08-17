@@ -28,13 +28,14 @@ class CalendarNormalizationTests(unittest.TestCase):
         self.week_start = datetime.datetime(2026, 8, 2, tzinfo=self.timezone)
         self.week_end = self.week_start + datetime.timedelta(days=7)
 
-    def test_private_apple_calendar_masks_title_and_location(self):
+    def test_private_apple_calendar_masks_title_location_and_notes(self):
         event = _normalize_event(
             source="apple",
             event_id="private-1",
             calendar_name="Private",
             title="Sensitive appointment",
             location="Private office",
+            notes="Private details",
             start=self.week_start + datetime.timedelta(days=1, hours=10),
             end=self.week_start + datetime.timedelta(days=1, hours=11),
             private=True,
@@ -42,6 +43,7 @@ class CalendarNormalizationTests(unittest.TestCase):
 
         self.assertIn(event["title"], {"Busy", "忙碌"})
         self.assertEqual(event["location"], "")
+        self.assertEqual(event["notes"], "")
 
     def test_public_apple_event_keeps_name_location_and_time_range(self):
         event = _normalize_event(
@@ -50,6 +52,7 @@ class CalendarNormalizationTests(unittest.TestCase):
             calendar_name="UGA Classes",
             title="CSCI 8000",
             location="Boyd 328",
+            notes="Geography 0155",
             start=self.week_start + datetime.timedelta(days=2, hours=9, minutes=55),
             end=self.week_start + datetime.timedelta(days=2, hours=11, minutes=15),
             private=False,
@@ -59,6 +62,7 @@ class CalendarNormalizationTests(unittest.TestCase):
         rendered = agenda["days"][2]["events"][0]
         self.assertEqual(rendered["title"], "CSCI 8000")
         self.assertEqual(rendered["location"], "Boyd 328")
+        self.assertEqual(rendered["notes"], "Geography 0155")
         self.assertEqual(rendered["time"], "09:55–11:15")
         self.assertEqual(rendered["duration"], "1h20m")
 
@@ -242,6 +246,7 @@ DTEND:20260731T150000Z\r
 RRULE:FREQ=WEEKLY;COUNT=3\r
 SUMMARY:TALENT Project\r
 LOCATION:Boyd GRSC\r
+DESCRIPTION:Weekly project sync\r
 END:VEVENT\r
 END:VCALENDAR\r
 """
@@ -257,6 +262,7 @@ END:VCALENDAR\r
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0]["title"], "TALENT Project")
         self.assertEqual(events[0]["location"], "Boyd GRSC")
+        self.assertEqual(events[0]["notes"], "Weekly project sync")
         self.assertEqual(events[0]["start"].date(), datetime.date(2026, 8, 7))
         mock_get.assert_called_once_with(
             "https://example.com/uga.ics",
@@ -275,6 +281,7 @@ DTSTART:20260805T140000Z\r
 DTEND:20260805T150000Z\r
 SUMMARY:Sensitive event\r
 LOCATION:Private office\r
+DESCRIPTION:Private details\r
 END:VEVENT\r
 END:VCALENDAR\r
 """
@@ -290,6 +297,7 @@ END:VCALENDAR\r
         self.assertEqual(len(events), 1)
         self.assertIn(events[0]["title"], {"Busy", "忙碌"})
         self.assertEqual(events[0]["location"], "")
+        self.assertEqual(events[0]["notes"], "")
 
 
 class CalendarCacheTests(unittest.TestCase):
