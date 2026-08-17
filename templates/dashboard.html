@@ -60,7 +60,7 @@
             white-space: nowrap;
             font-size: 13px;
             font-size: clamp(13px, 34cqh, 19px);
-            line-height: 1;
+            line-height: 1.2;
         }
 
         .calendar-event-title,
@@ -93,7 +93,7 @@
         .calendar-event-time {
             font-size: 11px;
             font-size: clamp(11px, 27cqh, 15px);
-            line-height: 1;
+            line-height: 1.2;
             font-weight: 800;
             font-variant-numeric: tabular-nums;
         }
@@ -226,7 +226,7 @@
                         {% endif %}
 
                         {% for event in day.timed_events %}
-                        <div class="calendar-event" style="position: absolute; box-sizing: border-box; overflow: hidden; z-index: 2; background: white; border: 2px solid black; padding: 3px 4px; top: calc({{ event.top_pct }}% + 1px); height: max(10px, calc({{ event.height_pct }}% - 2px)); left: calc({{ event.left_pct }}% + 1px); width: calc({{ event.width_pct }}% - 2px);">
+                        <div class="calendar-event" style="position: absolute; box-sizing: border-box; overflow: hidden; z-index: 2; background: white; border: 2px solid black; padding: 2px 4px; top: calc({{ event.top_pct }}% + 1px); height: max(10px, calc({{ event.height_pct }}% - 2px)); left: calc({{ event.left_pct }}% + 1px); width: calc({{ event.width_pct }}% - 2px);">
                             <div class="calendar-event-heading">
                                 <span class="calendar-event-title">{{ event.title }}</span>
                                 {% if event.notes or event.location %}<span class="calendar-event-details">{% if event.notes %}{{ event.notes }}{% if event.location %} · {% endif %}{% endif %}{% if event.location %}{{ event.location }}{% endif %}</span>{% endif %}
