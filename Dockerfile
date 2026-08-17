@@ -32,6 +32,10 @@ WORKDIR /app
 # Enable bytecode compilation
 ENV UV_COMPILE_BYTECODE=1
 
+# Stream print() straight to `docker logs`. Python block-buffers stdout when it
+# is a pipe, which otherwise swallows provider errors until the buffer fills.
+ENV PYTHONUNBUFFERED=1
+
 # Copy project files
 COPY pyproject.toml uv.lock ./
 

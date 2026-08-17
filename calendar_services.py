@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 import caldav
 import recurring_ical_events
 import requests
+from caldav.lib.error import AuthorizationError
 from icalendar import Calendar
 
 from cache_utils import SimpleCache
@@ -220,9 +221,24 @@ def _provider_events(cache, key, fetcher, start, end, provider_name=None):
         cache.set(key, events)
         return events
     except Exception as error:
-        print(f"Calendar provider error ({provider_name or key}): {error}")
+        label = provider_name or key
+        if isinstance(error, (CalendarAuthRequired, AuthorizationError)):
+            # An empty calendar renders identically to a working one, so say
+            # plainly that the credentials were rejected and how to fix them.
+            print(
+                f"Calendar provider AUTHENTICATION FAILED ({label}): {error}\n"
+                "  iCloud rejects email aliases: APPLE_ID must be the primary "
+                "Apple ID for the account, and APPLE_APP_PASSWORD must be an "
+                "app-specific password from appleid.apple.com."
+            )
+        else:
+            print(f"Calendar provider error ({label}): {error}")
         stale = cache.get_stale(key)
-        return copy.deepcopy(stale) if stale is not None else []
+        if stale is not None:
+            print(f"Calendar provider ({label}): reusing the last cached events")
+            return copy.deepcopy(stale)
+        print(f"Calendar provider ({label}): dropping this calendar from the week")
+        return []
 
 
 def _duration_label(start, end):

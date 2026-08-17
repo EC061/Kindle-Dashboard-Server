@@ -1,13 +1,18 @@
+import contextlib
 import datetime
+import io
 import json
 import time
 import unittest
 from unittest.mock import Mock, patch
 from zoneinfo import ZoneInfo
 
+from caldav.lib.error import AuthorizationError
+
 import calendar_services
 from cache_utils import SimpleCache
 from calendar_services import (
+    CalendarAuthRequired,
     _normalize_event,
     _provider_events,
     build_week_agenda,
@@ -304,6 +309,45 @@ class CalendarCacheTests(unittest.TestCase):
             datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=7),
         )
         self.assertEqual(result, cached)
+
+    def _run_failing_provider(self, error):
+        def failing_fetcher(_start, _end):
+            raise error
+
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            result = _provider_events(
+                SimpleCache(ttl_seconds=1),
+                "week",
+                failing_fetcher,
+                datetime.datetime.now(datetime.UTC),
+                datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=7),
+                "iCloud",
+            )
+        return result, output.getvalue()
+
+    def test_rejected_caldav_credentials_are_reported_on_stdout(self):
+        result, logged = self._run_failing_provider(
+            AuthorizationError(url="https://caldav.icloud.com", reason="Unauthorized")
+        )
+
+        self.assertEqual(result, [])
+        self.assertIn("AUTHENTICATION FAILED", logged)
+        self.assertIn("iCloud", logged)
+        self.assertIn("APPLE_ID", logged)
+
+    def test_missing_caldav_credentials_are_reported_on_stdout(self):
+        _, logged = self._run_failing_provider(
+            CalendarAuthRequired("APPLE_ID and APPLE_APP_PASSWORD are required")
+        )
+
+        self.assertIn("AUTHENTICATION FAILED", logged)
+
+    def test_non_auth_failure_keeps_the_plain_error_message(self):
+        _, logged = self._run_failing_provider(RuntimeError("temporary outage"))
+
+        self.assertNotIn("AUTHENTICATION FAILED", logged)
+        self.assertIn("temporary outage", logged)
 
 
 if __name__ == "__main__":
