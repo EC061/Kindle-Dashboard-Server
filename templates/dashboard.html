@@ -40,6 +40,63 @@
             padding-bottom: 0.15em;
             margin-bottom: -0.15em;
         }
+
+        /* Calendar cards are different heights because their duration is
+           proportional. Container units let longer classes use the extra
+           room while short classes remain compact enough for two rows. */
+        .calendar-event {
+            container-type: size;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: clamp(1px, 3cqh, 3px);
+        }
+
+        .calendar-event-heading {
+            display: flex;
+            align-items: baseline;
+            gap: 5px;
+            min-width: 0;
+            white-space: nowrap;
+            font-size: 13px;
+            font-size: clamp(13px, 34cqh, 19px);
+            line-height: 1;
+        }
+
+        .calendar-event-title,
+        .calendar-event-details,
+        .calendar-event-time {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .calendar-event-title {
+            flex: 0 1 auto;
+            min-width: 0;
+            max-width: 58%;
+            font-weight: 900;
+        }
+
+        .calendar-event-title:only-child {
+            max-width: 100%;
+        }
+
+        .calendar-event-details {
+            flex: 1 1 0;
+            min-width: 0;
+            color: #6b7280;
+            font-size: 0.86em;
+            font-weight: 700;
+        }
+
+        .calendar-event-time {
+            font-size: 11px;
+            font-size: clamp(11px, 27cqh, 15px);
+            line-height: 1;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+        }
     </style>
 </head>
 <body>
@@ -169,10 +226,12 @@
                         {% endif %}
 
                         {% for event in day.timed_events %}
-                        <div style="position: absolute; box-sizing: border-box; overflow: hidden; z-index: 2; background: white; border: 2px solid black; padding: 2px 3px; top: calc({{ event.top_pct }}% + 1px); height: max(10px, calc({{ event.height_pct }}% - 2px)); left: calc({{ event.left_pct }}% + 1px); width: calc({{ event.width_pct }}% - 2px);">
-                            <div class="truncate" style="font-size: 13px; line-height: 1.05; font-weight: 900;">{{ event.title }}</div>
-                            {% if event.notes or event.location %}<div class="truncate text-gray-500" style="font-size: 11px; line-height: 1.05; font-weight: 700;">{% if event.notes %}{{ event.notes }}{% if event.location %} · {% endif %}{% endif %}{% if event.location %}{{ event.location }}{% endif %}</div>{% endif %}
-                            <div class="truncate tabular-nums" style="font-size: 11px; line-height: 1.05; font-weight: 700;">{{ event.time }}{% if event.duration %} · {{ event.duration }}{% endif %}</div>
+                        <div class="calendar-event" style="position: absolute; box-sizing: border-box; overflow: hidden; z-index: 2; background: white; border: 2px solid black; padding: 3px 4px; top: calc({{ event.top_pct }}% + 1px); height: max(10px, calc({{ event.height_pct }}% - 2px)); left: calc({{ event.left_pct }}% + 1px); width: calc({{ event.width_pct }}% - 2px);">
+                            <div class="calendar-event-heading">
+                                <span class="calendar-event-title">{{ event.title }}</span>
+                                {% if event.notes or event.location %}<span class="calendar-event-details">{% if event.notes %}{{ event.notes }}{% if event.location %} · {% endif %}{% endif %}{% if event.location %}{{ event.location }}{% endif %}</span>{% endif %}
+                            </div>
+                            <div class="calendar-event-time">{{ event.time }}{% if event.duration %} · {{ event.duration }}{% endif %}</div>
                         </div>
                         {% endfor %}
                     </div>
